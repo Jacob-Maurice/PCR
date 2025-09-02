@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VCRT Admin</title>
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/admin_styles.css') }}">
+
+    <!-- jQuery -->
+    <script src="{{ url_for('static', filename='js/jquery-3.6.0.js') }}"></script>
+
+    <!-- Favicon -->
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <a class="navbar-brand" href="#">VCRT Admin</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav">
+                <!-- Home and PCR links remain -->
+                <li class="nav-item active">
+                    <a class="nav-link" href="#">Home</a>
+                    <a class="nav-link" href="#">PCR</a>
+                </li>
+            </ul>
+
+            <!-- Logout Button (Right-aligned) -->
+            <ul class="navbar-nav ml-auto">
+                <li class="nav-item">
+                    <a class="nav-link btn btn-danger" href="/logout" id="logoutButton">Logout</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container mt-5">
+        <div class="card">
+            <div class="card-body">
+                <h2>Welcome, Admin!</h2>
+                <p>Here you can manage users and review/revise PCR reports.</p>
+            </div>
+        </div>
+
+        <!-- Add User -->
+        <div class="card mt-4">
+            <div class="card-body">
+                <h3>Add New User</h3>
+                <form id="addUserForm">
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <input type="text" class="form-control" id="username" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" class="form-control" id="password" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirmPassword">Confirm Password</label>
+                        <input type="password" class="form-control" id="confirmPassword" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary custom-margin">Add User</button>
+                </form>
+                <div id="message" class="mt-3"></div>
+            </div>
+        </div>
+
+        <!-- Remove User -->
+        <div class="card mt-4">
+            <div class="card-body">
+                <h3>Remove User</h3>
+                <ul id="userList" class="list-group">
+                    <!-- User list dynamically populated here -->
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+    <!-- Custom JS -->
+    <script src="{{ url_for('static', filename='js/admin.js') }}"></script>
+</body>
+</html>

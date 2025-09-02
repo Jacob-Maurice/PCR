@@ -1,0 +1,43 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f4f4f4;
+    margin: 0;
+    padding: 0;
+}
+
+.navbar-brand {
+    font-size: 24px;
+}
+
+.container {
+    background: #fff;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.card {
+    margin-bottom: 20px;
+}
+
+h2, h3 {
+    color: #333;
+}
+
+p {
+    color: #666;
+}
+
+.alert {
+    margin-top: 20px;
+}
+
+.custom-margin {
+    margin-top: 20px;  /* Adjust the value as needed */
+}
+
+logoutButton {
+    font-size: 1.1rem; /* Larger font size */
+    padding: 10px 15px; /* More padding for a bigger button */
+    font-weight: bold; /* Make the text bold */
+}
