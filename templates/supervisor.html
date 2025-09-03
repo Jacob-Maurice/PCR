@@ -36,6 +36,53 @@
       height: 400px;
       margin-top: 20px;
     }
+    .form-group {
+      margin-top: 20px;
+    }
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .table th,
+    .table td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    .table th {
+      background-color: #f2f2f2;
+    }
+    .form-control {
+      width: 100%;
+      padding: 6px;
+      box-sizing: border-box;
+    }
+    .table td {
+      height: 40px;
+    }
+    .checkbox-container {
+      margin-top: 10px;
+    }
+    .checkbox-container label {
+      display: block;
+      margin-bottom: 5px;
+    }
+    .vital-signs-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .vital-signs-table th,
+    .vital-signs-table td {
+      border: 1px solid #ddd;
+      padding: 8px;
+      text-align: left;
+    }
+    .vital-signs-table th {
+      background-color: #f2f2f2;
+    }
+    .vital-signs-table td {
+      height: 40px;
+    }
   </style>
 </head>
 
@@ -155,7 +202,7 @@
             <label class="other-label">
               <input type="radio" name="sex" value="Other" id="otherRadio" required />
               Other:
-              <input type="text" id="otherText" name="otherSex" placeholder="Please specify..." oninput="checkOtherText()" />
+              <input type="text" id="sexOtherText" name="otherSex" placeholder="Please specify..." oninput="checkOtherText()" />
             </label>
           </div>
 
@@ -285,7 +332,7 @@
             <label class="checkbox-label checkbox-other-label">
               <input type="checkbox" name="airwayManagement[]" value="Other" />
               Other:
-              <input type="text" name="airwayManagementOther" id="otherText" placeholder="Please specify..." oninput="checkOtherText()" />
+              <input type="text" name="airwayManagementOther" id="airwayOtherText" placeholder="Please specify..." oninput="checkOtherText()" />
             </label>
           </div>
         </div>
@@ -516,32 +563,32 @@
             <input
               type="text"
               class="form-control"
-              id="2supervisor"
-              name="supervisor"
+              id="o2_supervisor"
+              name="o2_supervisor"
               required
               placeholder="Enter supervisor's name"
             />
             <input
               type="text"
               class="form-control"
-              id="2responder1"
-              name="responder1"
+              id="o2_responder1"
+              name="o2_responder1"
               required
               placeholder="Enter responder 1's name"
             />
             <input
               type="text"
               class="form-control"
-              id="2responder2"
-              name="responder2"
+              id="o2_responder2"
+              name="o2_responder2"
               required
               placeholder="Enter responder 2's name"
             />
             <input
               type="text"
               class="form-control"
-              id="2responder3"
-              name="responder3"
+              id="o2_responder3"
+              name="o2_responder3"
               required
               placeholder="Enter responder 3's name"
             />
@@ -596,7 +643,7 @@
             <label class="checkbox-label checkbox-other-label">
               <input type="checkbox" name="reasonForO2Therapy" value="Other" />
               Other:
-              <input type="text" name="reasonForO2TherapyOther" id="otherText" placeholder="Please specify..." oninput="checkOtherText()" />
+              <input type="text" name="reasonForO2TherapyOther" id="reasonO2OtherText" placeholder="Please specify..." oninput="checkOtherText()" />
             </label>
           </div>
 
@@ -644,28 +691,28 @@
               </thead>
               <tbody>
                 <tr>
-                  <td><input type="time" class="form-control" id="time1" name="time1" /></td>
-                  <td><input type="text" class="form-control" id="flowRate1" name="flowRate1" placeholder="Enter flow rate" /></td>
+                  <td><input type="time" class="form-control" id="frTime1" name="frTime1" /></td>
+                  <td><input type="text" class="form-control" id="frFlowRate1" name="frFlowRate1" placeholder="Enter flow rate" /></td>
                 </tr>
                 <tr>
-                  <td><input type="time" class="form-control" id="time2" name="time2" /></td>
-                  <td><input type="text" class="form-control" id="flowRate2" name="flowRate2" placeholder="Enter flow rate" /></td>
+                  <td><input type="time" class="form-control" id="frTime2" name="frTime2" /></td>
+                  <td><input type="text" class="form-control" id="frFlowRate2" name="frFlowRate2" placeholder="Enter flow rate" /></td>
                 </tr>
                 <tr>
-                  <td><input type="time" class="form-control" id="time3" name="time3" /></td>
-                  <td><input type="text" class="form-control" id="flowRate3" name="flowRate3" placeholder="Enter flow rate" /></td>
+                  <td><input type="time" class="form-control" id="frTime3" name="frTime3" /></td>
+                  <td><input type="text" class="form-control" id="frFlowRate3" name="frFlowRate3" placeholder="Enter flow rate" /></td>
                 </tr>
                 <tr>
-                  <td><input type="time" class="form-control" id="time4" name="time4" /></td>
-                  <td><input type="text" class="form-control" id="flowRate4" name="flowRate4" placeholder="Enter flow rate" /></td>
+                  <td><input type="time" class="form-control" id="frTime4" name="frTime4" /></td>
+                  <td><input type="text" class="form-control" id="frFlowRate4" name="frFlowRate4" placeholder="Enter flow rate" /></td>
                 </tr>
                 <tr>
-                  <td><input type="time" class="form-control" id="time5" name="time5" /></td>
-                  <td><input type="text" class="form-control" id="flowRate5" name="flowRate5" placeholder="Enter flow rate" /></td>
+                  <td><input type="time" class="form-control" id="frTime5" name="frTime5" /></td>
+                  <td><input type="text" class="form-control" id="frFlowRate5" name="frFlowRate5" placeholder="Enter flow rate" /></td>
                 </tr>
                 <tr>
-                  <td><input type="time" class="form-control" id="time6" name="time6" /></td>
-                  <td><input type="text" class="form-control" id="flowRate6" name="flowRate6" placeholder="Enter flow rate" /></td>
+                  <td><input type="time" class="form-control" id="frTime6" name="frTime6" /></td>
+                  <td><input type="text" class="form-control" id="frFlowRate6" name="frFlowRate6" placeholder="Enter flow rate" /></td>
                 </tr>
               </tbody>
             </table>
@@ -695,40 +742,6 @@
           </div>
         </div>
 
-        <style>
-          .form-group {
-            margin-top: 20px;
-          }
-          .table {
-            width: 100%;
-            border-collapse: collapse;
-          }
-          .table th,
-          .table td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-          }
-          .table th {
-            background-color: #f2f2f2;
-          }
-          .form-control {
-            width: 100%;
-            padding: 6px;
-            box-sizing: border-box;
-          }
-          .table td {
-            height: 40px;
-          }
-          .checkbox-container {
-            margin-top: 10px;
-          }
-          .checkbox-container label {
-            display: block;
-            margin-bottom: 5px;
-          }
-        </style>
-
         <div class="form-group">
           <table class="vital-signs-table">
             <thead>
@@ -745,12 +758,12 @@
             <tbody>
               <tr>
                 <td>Time:</td>
-                <td contenteditable="true" id="time1"></td>
-                <td contenteditable="true" id="time2"></td>
-                <td contenteditable="true" id="time3"></td>
-                <td contenteditable="true" id="time4"></td>
-                <td contenteditable="true" id="time5"></td>
-                <td contenteditable="true" id="time6"></td>
+                <td contenteditable="true" id="v2_time1"></td>
+                <td contenteditable="true" id="v2_time2"></td>
+                <td contenteditable="true" id="v2_time3"></td>
+                <td contenteditable="true" id="v2_time4"></td>
+                <td contenteditable="true" id="v2_time5"></td>
+                <td contenteditable="true" id="v2_time6"></td>
               </tr>
               <tr>
                 <td>SPO2:</td>
@@ -764,28 +777,6 @@
             </tbody>
           </table>
         </div>
-
-        <style>
-          .form-group {
-            margin-top: 20px;
-          }
-          .vital-signs-table {
-            width: 100%;
-            border-collapse: collapse;
-          }
-          .vital-signs-table th,
-          .vital-signs-table td {
-            border: 1px solid #ddd;
-            padding: 8px;
-            text-align: left;
-          }
-          .vital-signs-table th {
-            background-color: #f2f2f2;
-          }
-          .vital-signs-table td {
-            height: 40px;
-          }
-        </style>
 
         <div class="form-group">
           <h2>Call Description</h2>
@@ -854,7 +845,8 @@
           />
         </div>
 
-        <button type="submit" class="btn btn-primary">Finalize PCR</button>
+        <button type="submit" class="btn btn-primary">Submit</button>
+        <button type="button" id="clearDraftBtn" class="btn btn-outline-secondary" style="margin-left: 8px;">Clear Form</button>
       </form>
 
       <!-- Log out button -->
@@ -864,7 +856,7 @@
     </main>
   </div>
 
-  <script src="static/css/crypto-js.min.js"></script>
+  <!-- Removed crypto-js include (unused & wrong path) -->
   <script src="static/js/supervisor.js"></script>
 </body>
 </html>

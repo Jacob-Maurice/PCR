@@ -2,6 +2,7 @@
 import io
 import os
 import re
+import json
 import logging
 from datetime import datetime
 from typing import Optional
@@ -12,7 +13,7 @@ from flask import (
 )
 from flask_bcrypt import Bcrypt
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.dialects.sqlite import JSON
+from sqlalchemy.dialects.sqlite import JSON as SA_JSON
 from dotenv import load_dotenv
 
 # PDF (overlay demo)
@@ -52,7 +53,7 @@ SECONDARY_ADMIN_PASSWORD_HASH = os.getenv("SECONDARY_ADMIN_PASSWORD_HASH")  # bc
 # -------------------- Encryption helpers --------------------
 def load_app_secret_key() -> bytes:
     """
-    Reads the Fernet key used to wrap per-user encryption keys.
+    Reads the Fernet key used to wrap per-user encryption keys and to encrypt drafts.
     secret.key MUST contain a valid Fernet key (e.g. Fernet.generate_key()).
     """
     secret_key_filename = os.path.join(BASE_DIR, "secret.key")
@@ -115,19 +116,19 @@ class Submission(db.Model):
     id         = db.Column(db.Integer, primary_key=True)
     user_id    = db.Column(db.Integer, db.ForeignKey("user.id"), index=True, nullable=False)
     status     = db.Column(db.String(16), default="draft")  # draft | final
-    data       = db.Column(JSON, nullable=False, default={})
+    data       = db.Column(SA_JSON, nullable=False, default={})
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 class PCRRecord(db.Model):
     """
-    Mirrors your previous raw sqlite 'pcr_records' table, but via SQLAlchemy.
     Stores ONE encrypted draft per user (user_id UNIQUE).
+    encrypted_data is a base64/utf8 string from Fernet.encrypt().decode()
     """
     __tablename__ = "pcr_records"
     id            = db.Column(db.Integer, primary_key=True)
     user_id       = db.Column(db.Integer, db.ForeignKey("user.id"), unique=True, nullable=False)
-    encrypted_data= db.Column(db.Text, nullable=False)  # base64/utf8 string from Fernet.encrypt().decode()
+    encrypted_data= db.Column(db.Text, nullable=False)
 
 with app.app_context():
     db.create_all()
@@ -242,7 +243,7 @@ def add_user():
     if not username or not password:
         return jsonify({"message": "Username and password are required"}), 400
 
-    # Password strength (as you had)
+    # Password strength
     if not re.match(r"^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$", password):
         return jsonify({"message": "Password must be at least 8 characters long, contain an uppercase letter, a number, and a special character."}), 400
 
@@ -292,7 +293,7 @@ def get_submission():
 @app.post("/api/autosync")
 def autosync():
     """
-    Optional: mirror localStorage to server periodically.
+    Optional: mirror front-end to server periodically.
     Frontend can POST the full serialized form JSON here every N seconds or on blur.
     """
     uid = current_user_id()
@@ -309,11 +310,22 @@ def autosync():
 
     return jsonify({"ok": True, "id": sub.id, "status": sub.status})
 
+@app.post("/api/clear_draft")
+def clear_draft():
+    """
+    Deletes the encrypted draft for the current user.
+    (Does not touch finalized submissions.)
+    """
+    uid = current_user_id()
+    PCRRecord.query.filter_by(user_id=uid).delete()
+    db.session.commit()
+    return jsonify({"ok": True})
+
 @app.post("/api/submit")
 def submit_final():
     """
-    Finalize the submission (stores the JSON and marks status=final).
-    Your front-end's regular form submit can POST here.
+    Finalize the submission (stores the JSON and marks status=final),
+    then deletes any encrypted draft for this user.
     """
     uid = current_user_id()
     payload = request.get_json(silent=True) or {}
@@ -325,6 +337,10 @@ def submit_final():
     else:
         sub = Submission(user_id=uid, data=payload, status="final")
         db.session.add(sub)
+    db.session.commit()
+
+    # NEW: delete encrypted draft once final is stored
+    PCRRecord.query.filter_by(user_id=uid).delete()
     db.session.commit()
 
     return jsonify({"ok": True, "id": sub.id, "status": sub.status})
@@ -347,29 +363,28 @@ def download_pdf(submission_id: int):
         download_name=f"PCR_{submission_id}.pdf",
     )
 
-# -------------------- API: Encrypted Drafts (compat with your old endpoints) --------------------
+# -------------------- API: Encrypted Drafts --------------------
 @app.route("/submit_draft", methods=["POST"])
 def submit_draft():
     """
-    Stores an encrypted draft per user, wrapped with the user's decrypted data key.
-    Uses session user_id; ignores user_id from client for safety.
+    Stores an encrypted draft per user.
+    Uses a single app Fernet key (secret.key) to encrypt the JSON payload.
     """
     uid = current_user_id()
     data = request.get_json(silent=True) or {}
-    user = User.query.get(uid)
-    if not user or not user.encrypted_key:
-        return jsonify({"error": "No user encryption key found"}), 500
 
-    # Derive the per-user key to encrypt the data payload you send (stringify first)
+    # Ensure user row exists with key (not strictly required for app-key encryption,
+    # but keeps the model consistent with your earlier approach)
+    user = User.query.get(uid)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
     try:
-        user_key = decrypt_user_encryption_key(user.encrypted_key)
-        f = Fernet(Fernet.generate_key())  # <- NOTE: Fernet requires a 32-byte base64 key, not arbitrary 32 bytes.
-        # To use the 32-byte random key with Fernet you'd normally derive/convert; to keep behavior, we re-wrap via app key:
-        # Simpler: encrypt the JSON string with the APP key directly (same protection model as before).
         app_key = load_app_secret_key()
         f_app = Fernet(app_key)
-        data_str = str(data)
-        encrypted_payload = f_app.encrypt(data_str.encode()).decode("utf-8")
+        # Use JSON to serialize (avoid str(dict) which isn't safe to parse)
+        data_str = json.dumps(data, ensure_ascii=False)
+        encrypted_payload = f_app.encrypt(data_str.encode("utf-8")).decode("utf-8")
     except Exception as e:
         return jsonify({"error": f"Encryption failed: {e}"}), 500
 
@@ -387,7 +402,7 @@ def submit_draft():
 def get_draft():
     """
     Retrieves and decrypts the per-user encrypted draft.
-    Uses session user_id; ignores query user_id to avoid cross-access.
+    Returns {"draft": "<json-string>"}; client parses it.
     """
     uid = current_user_id()
     rec = PCRRecord.query.filter_by(user_id=uid).first()
@@ -397,7 +412,7 @@ def get_draft():
     try:
         app_key = load_app_secret_key()
         f_app = Fernet(app_key)
-        decrypted = f_app.decrypt(rec.encrypted_data.encode()).decode("utf-8")
+        decrypted = f_app.decrypt(rec.encrypted_data.encode("utf-8")).decode("utf-8")
         return jsonify({"draft": decrypted}), 200
     except Exception as e:
         return jsonify({"error": f"Decryption failed: {e}"}), 500

@@ -46,16 +46,26 @@ $(document).ready(function () {
         $.get("/admin/get_users", function (data) {
             let userList = $("#userList");
             userList.empty();
+
             data.users.forEach(user => {
+                let removeBtn = "";
+
+                // Only show remove button if not admin
+                if (user.toLowerCase() !== "vcrt_admin") {
+                    console.log(user);
+                    removeBtn = `<button class="btn btn-danger btn-sm remove-user" data-username="${user}">Remove</button>`;
+                }
+
                 userList.append(`
                     <li class="list-group-item d-flex justify-content-between align-items-center">
                         ${user}
-                        <button class="btn btn-danger btn-sm remove-user" data-username="${user}">Remove</button>
+                        ${removeBtn}
                     </li>
                 `);
             });
         });
     }
+
 
     // Handle user removal with event delegation
     $("#userList").on("click", ".remove-user", function () {

@@ -4,31 +4,31 @@ function autoGrow(el) {
   el.style.height = el.scrollHeight + "px";
 }
 
-// ===== CONFIG (per-user localStorage) =====
+// ===== CONFIG (server-side drafts, per-user) =====
 const FORM_ID = "pcrForm";
-const SCHEMA_VER = "v1"; // bump when schema changes
+const AUTOSAVE_MS = 400;
 
-// Get user id injected by server (prefer window.APP, fallback to data-user-id)
+// Get user id injected by server (prefer window.APP, fallback to data-user-id on <body>)
 const USER_ID =
   (window.APP && window.APP.userId) ||
-  document.documentElement.getAttribute("data-user-id") ||
+  document.body.getAttribute("data-user-id") ||
   "anon";
-
-// one key per user
-const LS_PREFIX = `PCRForm:${SCHEMA_VER}:user:`;
-const STORAGE_KEY = `${LS_PREFIX}${USER_ID}`;
-const AUTOSAVE_MS = 300; // debounce delay
 
 // ===== contenteditable cell ids (MAKE SURE THESE ARE UNIQUE IN HTML) =====
 const CE_IDS = [
+  // First vitals table
   "time1","time2","time3","time4","time5","time6",
   "pulse1","pulse2","pulse3","pulse4","pulse5","pulse6",
   "resp1","resp2","resp3","resp4","resp5","resp6",
   "bp1","bp2","bp3","bp4","bp5","bp6",
   "loc1","loc2","loc3","loc4","loc5","loc6",
   "skin1","skin2","skin3","skin4","skin5","skin6",
+
+  // Second vitals table (renamed to avoid duplicate IDs)
+  "v2_time1","v2_time2","v2_time3","v2_time4","v2_time5","v2_time6",
+
+  // SPO2 row
   "spo21","spo22","spo23","spo24","spo25","spo26"
-  // add any renamed/second-table IDs here (e.g., "v2_time1", ...)
 ];
 
 // ===== State =====
@@ -40,6 +40,11 @@ const resetImageBtn = document.getElementById("resetImageBtn");
 
 let injuryPoints = []; // [{x,y}, ...]
 let saveTimer;
+let suppressAutosave = false; // prevents autosave during clear/reset
+
+// ---- No-op guards for inline handlers present in HTML ----
+function checkOtherText(){ /* placeholder to avoid ReferenceError */ }
+function checkVisitorText(){ /* placeholder to avoid ReferenceError */ }
 
 // ===== Helpers =====
 function drawCircle(x, y) {
@@ -94,7 +99,7 @@ function serializeForm(formEl) {
   // canvas points
   data.injuryPoints = injuryPoints.slice();
 
-  // (optional but useful) stamp user_id so you can debug
+  // stamp user_id so you can debug
   data._userId = USER_ID;
 
   return data;
@@ -143,37 +148,77 @@ function restoreForm(formEl, data) {
   }
 }
 
-// Debounced autosave to this user's key
+// --- server draft helpers ---
+async function saveDraftToServer(payload) {
+  await fetch("/submit_draft", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    body: JSON.stringify(payload)
+  });
+}
+
 function autosave() {
+  if (suppressAutosave) return;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeForm(form)));
+    saveDraftToServer(serializeForm(form)).catch(console.error);
   }, AUTOSAVE_MS);
 }
 
-// ===== Init once DOM is ready =====
-document.addEventListener("DOMContentLoaded", () => {
-  // 0) Ensure per-user isolation: remove other users' keys with the same prefix
-  for (let i = localStorage.length - 1; i >= 0; i--) {
-    const k = localStorage.key(i);
-    if (k && k.startsWith(LS_PREFIX) && k !== STORAGE_KEY) {
-      localStorage.removeItem(k);
-    }
-  }
+// --- reset/clear helpers ---
+function resetFormUI() {
+  suppressAutosave = true;
 
+  // 1) Reset standard inputs & textareas
+  form.reset();
+
+  // 2) Clear radios/checkboxes explicitly
+  form.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(el => {
+    el.checked = false;
+  });
+
+  // 3) Clear contenteditable cells
+  CE_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerText = "";
+  });
+
+  // 4) Clear canvas marks & redraw base image
+  injuryPoints = [];
+  const originalImageSrc = injuryImage.getAttribute("data-original-src") || injuryImage.src;
+  loadImageToCanvas(originalImageSrc);
+
+  // 5) Clear custom "Other" fields
+  ["sexOtherText","airwayOtherText","reasonO2OtherText","visitorText"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = "";
+  });
+
+  setTimeout(() => { suppressAutosave = false; }, 300);
+}
+
+// ===== Init once DOM is ready =====
+document.addEventListener("DOMContentLoaded", async () => {
   // 1) draw the base image
   const originalImageSrc = injuryImage.getAttribute("data-original-src") || injuryImage.src;
   loadImageToCanvas(originalImageSrc);
 
-  // 2) restore from this user's localStorage only
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (raw) {
-    try {
-      const data = JSON.parse(raw);
-      loadImageToCanvas(originalImageSrc, () => {
-        restoreForm(form, data);
-      });
-    } catch {}
+  // 2) restore from server draft
+  try {
+    const r = await fetch("/get_draft", { credentials: "same-origin" });
+    if (r.status === 200) {
+      const { draft } = await r.json();
+      if (draft) {
+        let data = {};
+        try { data = JSON.parse(draft); } catch { /* tolerate older repr */ }
+        loadImageToCanvas(originalImageSrc, () => restoreForm(form, data));
+      }
+    } else if (r.status !== 404) {
+      console.warn("Unexpected get_draft status:", r.status);
+    }
+  } catch (e) {
+    console.warn("Error restoring draft:", e);
   }
 
   // 3) canvas click → add point + draw + autosave
@@ -203,18 +248,81 @@ document.addEventListener("DOMContentLoaded", () => {
     if (el) el.addEventListener("input", autosave);
   });
 
-  // 7) page hide/unload: best-effort save (to this user's key)
+  // 7) page hide/unload: best-effort save
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeForm(form)));
+      saveDraftToServer(serializeForm(form)).catch(() => {});
     }
   });
   window.addEventListener("beforeunload", () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(serializeForm(form)));
+    try {
+      navigator.sendBeacon?.("/submit_draft",
+        new Blob([JSON.stringify(serializeForm(form))], { type: "application/json" })
+      );
+    } catch {}
   });
 });
 
-// ===== Submit (clear this user's storage on success) =====
+// ===== Logout (force-save draft) =====
+const logoutBtn = document.getElementById("logoutButton");
+if (logoutBtn) {
+  logoutBtn.addEventListener("click", async (e) => {
+    try {
+      const payload = serializeForm(form);
+      const data = JSON.stringify(payload);
+      const blob = new Blob([data], { type: "application/json" });
+
+      let sent = false;
+      if (navigator.sendBeacon) {
+        sent = navigator.sendBeacon("/submit_draft", blob);
+      }
+      if (!sent) {
+        await fetch("/submit_draft", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: data,
+          credentials: "same-origin",
+          keepalive: true
+        });
+      }
+    } catch (err) {
+      console.warn("Could not save draft on logout:", err);
+    } finally {
+      window.location.href = "/logout";
+    }
+  });
+}
+
+// ===== Clear Draft =====
+const clearBtn = document.getElementById("clearDraftBtn");
+if (clearBtn) {
+  clearBtn.addEventListener("click", async () => {
+    suppressAutosave = true;
+    try {
+      const res = await fetch("/api/clear_draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin"
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert("Could not clear draft: " + (err.error || err.message || res.status));
+        return;
+      }
+
+      resetFormUI();
+      alert("Draft cleared.");
+    } catch (e) {
+      console.error(e);
+      alert("Network error clearing draft.");
+    } finally {
+      setTimeout(() => { suppressAutosave = false; }, 300);
+    }
+  });
+}
+
+// ===== Submit (server clears draft on success) =====
 document.getElementById("pcrForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const payload = serializeForm(e.currentTarget);
@@ -228,9 +336,11 @@ document.getElementById("pcrForm").addEventListener("submit", async (e) => {
     });
     const out = await res.json();
     if (res.ok) {
-      // delete ONLY this user's entry
-      localStorage.removeItem(STORAGE_KEY);
       alert("Submitted!");
+      e.currentTarget.reset();
+      injuryPoints = [];
+      const originalImageSrc = injuryImage.getAttribute("data-original-src") || injuryImage.src;
+      loadImageToCanvas(originalImageSrc);
     } else {
       alert("Submit error: " + (out.error || out.message || "unknown"));
     }
