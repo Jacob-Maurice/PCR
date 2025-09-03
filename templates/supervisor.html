@@ -1,387 +1,406 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Microsoft Forms Replica</title>
-    
-    <!-- Link to custom styles -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='supervisor_styles.css') }}">
-    
-    <!-- Bootstrap CSS -->
-    <link rel="stylesheet" href="static/css/bootstrap.min.css">
-    
-    <!-- Favicon -->
-    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
-    
-    <!-- Custom styles for image container and canvas -->
-<style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Microsoft Forms Replica</title>
+
+  <!-- Link to custom styles -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='supervisor_styles.css') }}" />
+
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="static/css/bootstrap.min.css" />
+  <link rel="stylesheet" href="static/css/supervisor_styles.css"/>
+
+  <!-- Favicon -->
+  <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon" />
+
+  <!-- Custom styles for image container and canvas -->
+  <style>
     .image-container {
-        display: flex;
-        justify-content: center; /* Centers images horizontally */
-        margin-bottom: 20px;
+      display: flex;
+      justify-content: center; /* Centers images horizontally */
+      margin-bottom: 20px;
     }
     .image-container img {
-        width: 200px;
-        cursor: pointer;
-        border: 2px solid transparent;
+      width: 200px;
+      cursor: pointer;
+      border: 2px solid transparent;
     }
     .image-container img.selected {
-        border-color: #0078D4; /* Highlight selected image */
+      border-color: #0078D4; /* Highlight selected image */
     }
     #canvas {
-        border: 1px solid #ccc;
-        width: 100%;
-        height: 400px;
-        margin-top: 20px;
+      border: 1px solid #ccc;
+      width: 100%;
+      height: 400px;
+      margin-top: 20px;
     }
-</style>
-
+  </style>
 </head>
-<body>
-    <div class="form-container">
-        <header>
-            <h1>Patient Care Report (PCR)</h1>
-        </header>
-        <main>
-            <!-- Form starts here -->
-            <form id="pcrForm">
-                
-                <!-- Form fields for patient information -->
-                <div class="form-group">
-                    <label for="date">1. Date</label>
-                    <input type="date" class="form-control" id="date" name="date" required>
-                </div>
 
-                <div class="form-group">
-                    <label for="location">2. Location</label>
-                    <input type="text" class="form-control" id="location" name="location" placeholder="Enter location" required>
-                </div>
+<body data-user-id="{{ session['user_id'] }}">
+  <div class="form-container">
+    <header>
+      <h1>Patient Care Report (PCR)</h1>
+    </header>
 
-                <div class="form-group">
-                    <label for="callNumber">3. Call Number</label>
-                    <input type="text" class="form-control" id="callNumber" name="callNumber" placeholder="Enter call number" required>
-                </div>
+    <main>
+      <!-- Form starts here -->
+      <form id="pcrForm">
+        <!-- Form fields for patient information -->
+        <div class="form-group">
+          <label for="date">1. Date</label>
+          <input type="date" class="form-control" id="date" name="date" required />
+        </div>
 
-                <div class="form-group">
-                    <label for="reportNumber">4. Report Number</label>
-                    <input type="text" class="form-control" id="reportNumber" name="reportNumber" placeholder="Enter report number" required>
-                </div>
+        <div class="form-group">
+          <label for="location">2. Location</label>
+          <input type="text" class="form-control" id="location" name="location" placeholder="Enter location" required />
+        </div>
 
-                <div class="form-group">
-                    <label>5. Responders Involved</label>
-                    <div class="responders-container">
-                        <input type="text" class="form-control mb-2" name="responder1" placeholder="Responder 1">
-                        <input type="text" class="form-control mb-2" name="responder2" placeholder="Responder 2">
-                        <input type="text" class="form-control mb-2" name="responder3" placeholder="Responder 3">
-                    </div>
-                </div>
+        <div class="form-group">
+          <label for="callNumber">3. Call Number</label>
+          <input type="text" class="form-control" id="callNumber" name="callNumber" placeholder="Enter call number" required />
+        </div>
 
-                <div class="form-group">
-                    <label for="supervisor">6. Supervisor</label>
-                    <input type="text" class="form-control" id="supervisor" name="supervisor" placeholder="Enter supervisor's name" required>
-                </div>
+        <div class="form-group">
+          <label for="reportNumber">4. Report Number</label>
+          <input type="text" class="form-control" id="reportNumber" name="reportNumber" placeholder="Enter report number" required />
+        </div>
 
-                <div class="form-group">
-                    <label for="primaryPSM">7. Primary PSM</label>
-                    <input type="text" class="form-control" id="primaryPSM" name="primaryPSM" placeholder="Enter Primary PSM's name" required>
-                </div>
+        <div class="form-group">
+          <label>5. Responders Involved</label>
+          <div class="responders-container">
+            <input type="text" class="form-control mb-2" name="responder1" placeholder="Responder 1" />
+            <input type="text" class="form-control mb-2" name="responder2" placeholder="Responder 2" />
+            <input type="text" class="form-control mb-2" name="responder3" placeholder="Responder 3" />
+          </div>
+        </div>
 
-                <div class="form-group">
-                    <label for="timeNotified">8. Time Notified</label>
-                    <input type="text" class="form-control" id="timeNotified" name="timeNotified" placeholder="HH:MM (army time)" required>
-                </div>
+        <div class="form-group">
+          <label for="supervisor">6. Supervisor</label>
+          <input type="text" class="form-control" id="supervisor" name="supervisor" placeholder="Enter supervisor's name" required />
+        </div>
 
-                <div class="form-group">
-                    <label for="onScene">9. On Scene</label>
-                    <input type="text" class="form-control" id="onScene" name="onScene" placeholder="HH:MM (army time)" required>
-                </div>
+        <div class="form-group">
+          <label for="primaryPSM">7. Primary PSM</label>
+          <input type="text" class="form-control" id="primaryPSM" name="primaryPSM" placeholder="Enter Primary PSM's name" required />
+        </div>
 
-                <div class="form-group">
-                    <label for="transportArrived">10. Transport Arrived</label>
-                    <input type="text" class="form-control" id="transportArrived" name="transportArrived" placeholder="HH:MM (army time)" required>
-                </div>
+        <div class="form-group">
+          <label for="timeNotified">8. Time Notified</label>
+          <input type="text" class="form-control" id="timeNotified" name="timeNotified" placeholder="HH:MM (army time)" required />
+        </div>
 
-                <div class="form-group">
-                    <label for="clearedScene">11. Cleared Scene</label>
-                    <input type="text" class="form-control" id="clearedScene" name="clearedScene" placeholder="HH:MM (army time)" required>
-                </div>
+        <div class="form-group">
+          <label for="onScene">9. On Scene</label>
+          <input type="text" class="form-control" id="onScene" name="onScene" placeholder="HH:MM (army time)" required />
+        </div>
 
-                <div class="form-group">
-                    <label for="paramedicsCalledBy">12. Paramedics Called by</label>
-                    <input type="text" class="form-control" id="paramedicsCalledBy" name="paramedicsCalledBy" placeholder="Enter name" required>
-                </div>
+        <div class="form-group">
+          <label for="transportArrived">10. Transport Arrived</label>
+          <input type="text" class="form-control" id="transportArrived" name="transportArrived" placeholder="HH:MM (army time)" required />
+        </div>
 
-                <div class="form-group">
-                    <label for="firstAgencyOnScene">13. First Agency on Scene</label>
-                    <input type="text" class="form-control" id="firstAgencyOnScene" name="firstAgencyOnScene" placeholder="Enter agency name" required>
-                </div>
+        <div class="form-group">
+          <label for="clearedScene">11. Cleared Scene</label>
+          <input type="text" class="form-control" id="clearedScene" name="clearedScene" placeholder="HH:MM (army time)" required />
+        </div>
 
-                <div class="form-group">
-                    <label for="patientName">14. Patient Name</label>
-                    <input type="text" class="form-control" id="patientName" name="patientName" placeholder="Enter patient name" required>
-                </div>
+        <div class="form-group">
+          <label for="paramedicsCalledBy">12. Paramedics Called by</label>
+          <input type="text" class="form-control" id="paramedicsCalledBy" name="paramedicsCalledBy" placeholder="Enter name" required />
+        </div>
 
-                <div class="form-group">
-                    <label for="dob">15. Date of Birth</label>
-                    <input type="date" class="form-control" id="dob" name="dob" required>
-                </div>
+        <div class="form-group">
+          <label for="firstAgencyOnScene">13. First Agency on Scene</label>
+          <input type="text" class="form-control" id="firstAgencyOnScene" name="firstAgencyOnScene" placeholder="Enter agency name" required />
+        </div>
 
-                <div class="form-group">
-                    <label for="age">16. Age</label>
-                    <input type="text" class="form-control" id="age" name="age" placeholder="Enter age" required>
-                </div>
+        <div class="form-group">
+          <label for="patientName">14. Patient Name</label>
+          <input type="text" class="form-control" id="patientName" name="patientName" placeholder="Enter patient name" required />
+        </div>
 
+        <div class="form-group">
+          <label for="dob">15. Date of Birth</label>
+          <input type="date" class="form-control" id="dob" name="dob" required />
+        </div>
 
+        <div class="form-group">
+          <label for="age">16. Age</label>
+          <input type="text" class="form-control" id="age" name="age" placeholder="Enter age" required />
+        </div>
 
+        <div class="form-group">
+          <label>17. Sex:</label>
+          <div class="checkbox-container">
+            <label>
+              <input type="radio" name="sex" value="Male" required />
+              Male
+            </label>
+            <label>
+              <input type="radio" name="sex" value="Female" required />
+              Female
+            </label>
+            <label>
+              <input type="radio" name="sex" value="Different from gender (M/F)" required />
+              Different from gender (M/F)
+            </label>
+            <label>
+              <input type="radio" name="sex" value="Does not want to disclose" required />
+              Does not want to disclose
+            </label>
+            <label class="other-label">
+              <input type="radio" name="sex" value="Other" id="otherRadio" required />
+              Other:
+              <input type="text" id="otherText" name="otherSex" placeholder="Please specify..." oninput="checkOtherText()" />
+            </label>
+          </div>
 
- <div class="form-group">
-    <label>17. Sex:</label>
-    <div class="checkbox-container">
-        <label>
-            <input type="radio" name="sex" value="Male" required> Male
-        </label>
-        <label>
-            <input type="radio" name="sex" value="Female" required> Female
-        </label>
-        <label>
-            <input type="radio" name="sex" value="Different from gender (M/F)" required> Different from gender (M/F)
-        </label>
-        <label>
-            <input type="radio" name="sex" value="Does not want to disclose" required> Does not want to disclose
-        </label>
-        <label class="other-label">
-            <input type="radio" name="sex" value="Other" id="otherRadio" required> Other:
-            <input type="text" id="otherText" name="otherSex" placeholder="Please specify..." oninput="checkOtherText()">
-        </label>
-    </div>
+          <label>18. Status:</label>
+          <div class="checkbox-container">
+            <label>
+              <input type="radio" name="status" value="Student" required />
+              Student
+            </label>
+            <label>
+              <input type="radio" name="status" value="Employee" required />
+              Employee
+            </label>
+            <label>
+              <input type="radio" name="status" value="Visitor/Other" required />
+              Visitor/Other
+            </label>
+            <label class="visitor-label" id="visitorLabel" style="display: none;">
+              <input type="text" id="visitorText" name="visitorText" placeholder="Please specify..." oninput="checkVisitorText()" />
+            </label>
+          </div>
 
-<label>18. Status:</label>
-<div class="checkbox-container">
-    <label>
-        <input type="radio" name="status" value="Student" required> Student
-    </label>
-    <label>
-        <input type="radio" name="status" value="Employee" required> Employee
-    </label>
-    <label>
-        <input type="radio" name="status" value="Visitor/Other" required> Visitor/Other
-    </label>
-    <label class="visitor-label" id="visitorLabel" style="display:none;">
-        <input type="text" id="visitorText" name="visitorText" placeholder="Please specify..." oninput="checkVisitorText()">
-    </label>
-</div>
+          <label>19. Workplace Injury?</label>
+          <div class="checkbox-container">
+            <label>
+              <input type="radio" name="workplaceInjury" value="Yes" />
+              Yes
+            </label>
+            <label>
+              <input type="radio" name="workplaceInjury" value="No" />
+              No
+            </label>
+          </div>
 
-<label>19. Workplace Injury?</label>
-<div class="checkbox-container">
-    <label>
-        <input type="radio" name="workplaceInjury" value="Yes"> Yes
-    </label>
-    <label>
-        <input type="radio" name="workplaceInjury" value="No"> No
-    </label>
-</div>
+          <label>20. Student/Employee Number:</label>
+          <div class="form-group">
+            <input type="text" name="studentEmployeeNumber" placeholder="Enter number" required />
+          </div>
 
-<label>20. Student/Employee Number:</label>
-<div class="form-group">
-    <input type="text" name="studentEmployeeNumber" placeholder="Enter number" required>
-</div>
+          <label>21. Emergency Contact:</label>
+          <div class="form-group emergency-contact">
+            <input type="text" name="emergencyContactName" placeholder="Name" required />
+            <input type="text" name="emergencyContactPhone" placeholder="Phone Number" required />
+          </div>
 
-<label>21. Emergency Contact:</label>
-<div class="form-group emergency-contact">
-    <input type="text" name="emergencyContactName" placeholder="Name" required>
-    <input type="text" name="emergencyContactPhone" placeholder="Phone Number" required>
-</div>
+          <label>22. Contacted?</label>
+          <div class="checkbox-container">
+            <label>
+              <input type="radio" name="contacted" value="Yes" required />
+              Yes
+            </label>
+            <label>
+              <input type="radio" name="contacted" value="No" required />
+              No
+            </label>
+          </div>
 
-<label>22. Contacted?</label>
-<div class="checkbox-container">
-    <label>
-        <input type="radio" name="contacted" value="Yes" required> Yes
-    </label>
-    <label>
-        <input type="radio" name="contacted" value="No" required> No
-    </label>
-</div>
+          <label>23. Contacted by:</label>
+          <div class="form-group">
+            <input type="text" name="contactedBy" placeholder="Enter name" required />
+          </div>
+        </div>
 
-<label>23. Contacted by:</label>
-<div class="form-group">
-    <input type="text" name="contactedBy" placeholder="Enter name" required>
-</div>
+        <h2>Patient Medical History Reason for Response:</h2>
 
-<h2>Patient Medical History Reason for Response:</h2>
-<div class="form-group">
-    <label style="margin-top: 20px;">Chief Complaint:</label>
-    <textarea name="chiefComplaint" placeholder="Enter chief complaint" rows="3" required></textarea>
-</div>
+        <div class="form-group">
+          <label style="margin-top: 20px;">Chief Complaint:</label>
+          <textarea name="chiefComplaint" placeholder="Enter chief complaint" rows="3" required></textarea>
+        </div>
 
-<div class="form-group">
-    <label>Signs and Symptoms:</label>
-    <textarea name="signsSymptoms" placeholder="Enter signs and symptoms" rows="3" oninput="autoGrow(this)" required></textarea>
-</div>
+        <div class="form-group">
+          <label>Signs and Symptoms:</label>
+          <textarea name="signsSymptoms" placeholder="Enter signs and symptoms" rows="3" oninput="autoGrow(this)" required></textarea>
+        </div>
 
-<div class="form-group">
-    <label>Allergies (Reactions to Allergy):</label>
-    <textarea name="allergies" placeholder="Enter allergies and reactions" rows="3" oninput="autoGrow(this)" required></textarea>
-</div>
+        <div class="form-group">
+          <label>Allergies (Reactions to Allergy):</label>
+          <textarea name="allergies" placeholder="Enter allergies and reactions" rows="3" oninput="autoGrow(this)" required></textarea>
+        </div>
 
-<div class="form-group">
-    <label>Medications (Name, Dose, Reason):</label>
-    <textarea name="medications" placeholder="Enter medications, dose, and reason" rows="3" oninput="autoGrow(this)" required></textarea>
-</div>
+        <div class="form-group">
+          <label>Medications (Name, Dose, Reason):</label>
+          <textarea name="medications" placeholder="Enter medications, dose, and reason" rows="3" oninput="autoGrow(this)" required></textarea>
+        </div>
 
-<div class="form-group">
-    <label>Pertinent Medical History:</label>
-    <textarea name="medicalHistory" placeholder="Enter pertinent medical history" rows="3" oninput="autoGrow(this)" required></textarea>
-</div>
+        <div class="form-group">
+          <label>Pertinent Medical History:</label>
+          <textarea name="medicalHistory" placeholder="Enter pertinent medical history" rows="3" oninput="autoGrow(this)" required></textarea>
+        </div>
 
-<div class="form-group">
-    <label>Last Meal (Time, What food/drinks):</label>
-    <textarea name="lastMeal" placeholder="Enter last meal details" rows="3" oninput="autoGrow(this)" required></textarea>
-</div>
+        <div class="form-group">
+          <label>Last Meal (Time, What food/drinks):</label>
+          <textarea name="lastMeal" placeholder="Enter last meal details" rows="3" oninput="autoGrow(this)" required></textarea>
+        </div>
 
-<div class="form-group">
-    <label>Rapid Body Survey Findings:</label>
-    <textarea name="bodySurvey" placeholder="Enter rapid body survey findings" rows="3" oninput="autoGrow(this)" required></textarea>
-</div>
+        <div class="form-group">
+          <label>Rapid Body Survey Findings:</label>
+          <textarea name="bodySurvey" placeholder="Enter rapid body survey findings" rows="3" oninput="autoGrow(this)" required></textarea>
+        </div>
 
+        <h2>Treatment Performed/Physical Findings:</h2>
+        <p>Only fill out if you performed the action on call.</p>
 
-    <h2>Treatment Performed/Physical Findings:</h2>
-    <p>Only fill out if you performed the action on call.</p>
-    
-    <div class="form-group">
-        <label>Airway Management:</label>
-        <div class="checkbox-container">
+        <div class="form-group">
+          <label>Airway Management:</label>
+          <div class="checkbox-container">
             <label class="checkbox-label">
-                <input type="checkbox" name="airwayManagement[]" value="Suctioning"> Suctioning
+              <input type="checkbox" name="airwayManagement[]" value="Suctioning" />
+              Suctioning
             </label>
             <label class="checkbox-label">
-                <input type="checkbox" name="airwayManagement[]" value="Positioning"> Positioning
+              <input type="checkbox" name="airwayManagement[]" value="Positioning" />
+              Positioning
             </label>
             <label class="checkbox-label">
-                <input type="checkbox" name="airwayManagement[]" value="OPA"> OPA
+              <input type="checkbox" name="airwayManagement[]" value="OPA" />
+              OPA
             </label>
             <label class="checkbox-label">
-                <input type="checkbox" name="airwayManagement[]" value="BVM"> BVM
+              <input type="checkbox" name="airwayManagement[]" value="BVM" />
+              BVM
             </label>
             <label class="checkbox-label">
-                <input type="checkbox" name="airwayManagement[]" value="Pocket Mask"> Pocket Mask
+              <input type="checkbox" name="airwayManagement[]" value="Pocket Mask" />
+              Pocket Mask
             </label>
             <label class="checkbox-label checkbox-other-label">
-                <input type="checkbox" name="airwayManagement[]" value="Other"> Other:
-                <input type="text" name="airwayManagementOther" id="otherText" placeholder="Please specify..." oninput="checkOtherText()">
+              <input type="checkbox" name="airwayManagement[]" value="Other" />
+              Other:
+              <input type="text" name="airwayManagementOther" id="otherText" placeholder="Please specify..." oninput="checkOtherText()" />
             </label>
+          </div>
         </div>
-    
 
-    <!-- New CPR Section -->
-    <div class="form-group">
-        <h3>CPR:</h3>
-        <p>Time Started:</p>
-        <input type="text" name="timeStarted" placeholder="Enter time started">
+        <!-- New CPR Section -->
+        <div class="form-group">
+          <h3>CPR:</h3>
+          <p>Time Started:</p>
+          <input type="text" name="timeStarted" placeholder="Enter time started" />
 
-        <p>Number of cycles of 30 compressions:</p>
-        <input type="text" name="numberOfCycles" placeholder="Enter number of cycles">
-    </div>
+          <p>Number of cycles of 30 compressions:</p>
+          <input type="text" name="numberOfCycles" placeholder="Enter number of cycles" />
+        </div>
 
-    <!-- New AED Section -->
-    <div class="form-group">
-        <h3>AED</h3>
-        <p>Shocks (#):</p>
-        <input type="text" name="numberOfShocks" placeholder="Enter number of shocks">
+        <!-- New AED Section -->
+        <div class="form-group">
+          <h3>AED</h3>
+          <p>Shocks (#):</p>
+          <input type="text" name="numberOfShocks" placeholder="Enter number of shocks" />
 
-        <p>Shock Not Advised (#):</p>
-        <input type="text" name="shockNotAdvised" placeholder="Enter number of times shock not advised">
-    </div>
+          <p>Shock Not Advised (#):</p>
+          <input type="text" name="shockNotAdvised" placeholder="Enter number of times shock not advised" />
+        </div>
 
-    <!-- Hemorrhage Control Section -->
-    <div class="form-group">
-        <h3>Hemorrhage Control:</h3>
-        <label class="checkbox-label">
-            <input type="checkbox" name="hemorrhageControl[]" value="Direct Pressure">
+        <!-- Hemorrhage Control Section -->
+        <div class="form-group">
+          <h3>Hemorrhage Control:</h3>
+          <label class="checkbox-label">
+            <input type="checkbox" name="hemorrhageControl[]" value="Direct Pressure" />
             Direct Pressure
-        </label>
-        <label class="checkbox-label">
-            <input type="checkbox" name="hemorrhageControl[]" value="Dressing">
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="hemorrhageControl[]" value="Dressing" />
             Dressing
-        </label>
-        <label class="checkbox-label">
-            <input type="checkbox" name="hemorrhageControl[]" value="Tourniquet">
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="hemorrhageControl[]" value="Tourniquet" />
             Tourniquet
-        </label>
-    </div>
+          </label>
+        </div>
 
-    <!-- Tourniquet Section -->
-    <div class="form-group">
-        <h3>Tourniquet:</h3>
-        <p>Time Applied:</p>
-        <input type="text" id="timeApplied" name="timeApplied" placeholder="Enter time applied">
+        <!-- Tourniquet Section -->
+        <div class="form-group">
+          <h3>Tourniquet:</h3>
+          <p>Time Applied:</p>
+          <input type="text" id="timeApplied" name="timeApplied" placeholder="Enter time applied" />
 
-        <p>Number of Turns</p>
-        <input type="text" id="turnX" name="turnX" placeholder="Enter number of turns">
-    </div>
+          <p>Number of Turns</p>
+          <input type="text" id="turnX" name="turnX" placeholder="Enter number of turns" />
+        </div>
 
-    <!-- Immobilization Section -->
-    <div class="form-group">
-        <h3>Immobilization:</h3>
-        <label class="checkbox-label">
-            <input type="checkbox" name="immobilization[]" value="C-Collar">
+        <!-- Immobilization Section -->
+        <div class="form-group">
+          <h3>Immobilization:</h3>
+          <label class="checkbox-label">
+            <input type="checkbox" name="immobilization[]" value="C-Collar" />
             C-Collar
-        </label>
-        <label class="checkbox-label">
-            <input type="checkbox" name="immobilization[]" value="Splints">
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="immobilization[]" value="Splints" />
             Splints
-        </label>
-        <label class="checkbox-label">
-            <input type="checkbox" name="immobilization[]" value="C-spine Manually Held">
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" name="immobilization[]" value="C-spine Manually Held" />
             C-spine Manually Held
-        </label>
-    </div>
+          </label>
+        </div>
 
-    <!-- Position of Patient Section -->
-    <div class="form-group">
-        <label for="positionOfPatient">Position of Patient:</label>
-        <input type="text" id="positionOfPatient" name="positionOfPatient" placeholder="Enter position of patient" required>
-    </div>
+        <!-- Position of Patient Section -->
+        <div class="form-group">
+          <label for="positionOfPatient">Position of Patient:</label>
+          <input type="text" id="positionOfPatient" name="positionOfPatient" placeholder="Enter position of patient" required />
+        </div>
 
-    <div class="form-group">
-        <h3>OPQRST:</h3>
-        
-        <label for="onset">Onset:</label>
-        <input type="text" id="onset" name="onset" placeholder="Enter onset">
-        
-        <label for="provocation">Provocation:</label>
-        <input type="text" id="provocation" name="provocation" placeholder="Enter provocation">
-        
-        <label for="quality">Quality:</label>
-        <input type="text" id="quality" name="quality" placeholder="Enter quality">
-        
-        <label for="radiation">Radiation:</label>
-        <input type="text" id="radiation" name="radiation" placeholder="Enter radiation">
-        
-        <label for="scale">Scale (1-10):</label>
-        <input type="number" id="scale" name="scale" min="1" max="10" placeholder="Enter scale">
-        
-        <label for="time">Time:</label>
-        <input type="time" id="time" name="time">
-    </div>
+        <div class="form-group">
+          <h3>OPQRST:</h3>
 
-    <div id="injury-report-section">
-        <h2>Mark Injury Location</h2>
-        <canvas id="injuryCanvas" width="400" height="600"></canvas>
-        <!-- Hidden image element with data-url attribute to store the original image path -->
-        <img id="injuryImage" src="{{ url_for('static', filename='images/front_image.jpg') }}" style="display: none;" 
-            data-original-src="{{ url_for('static', filename='images/front_image.jpg') }}">
-    </div>
+          <label for="onset">Onset:</label>
+          <input type="text" id="onset" name="onset" placeholder="Enter onset" />
 
-    <button type="button" id="resetImageBtn">Reset Image</button>
+          <label for="provocation">Provocation:</label>
+          <input type="text" id="provocation" name="provocation" placeholder="Enter provocation" />
 
-  
-   <div class="form-group">
-    <h3>Vital Signs</h3>
-    <table class="vital-signs-table">
-        <thead>
-            <tr>
+          <label for="quality">Quality:</label>
+          <input type="text" id="quality" name="quality" placeholder="Enter quality" />
+
+          <label for="radiation">Radiation:</label>
+          <input type="text" id="radiation" name="radiation" placeholder="Enter radiation" />
+
+          <label for="scale">Scale (1–10):</label>
+          <input type="number" id="scale" name="scale" min="1" max="10" placeholder="Enter scale" />
+
+          <label for="time">Time:</label>
+          <input type="time" id="time" name="time" />
+        </div>
+
+        <div id="injury-report-section">
+          <h2>Mark Injury Location</h2>
+          <canvas id="injuryCanvas" width="400" height="600"></canvas>
+          <!-- Hidden image element with data-url attribute to store the original image path -->
+          <img
+            id="injuryImage"
+            src="{{ url_for('static', filename='images/front_image.jpg') }}"
+            style="display: none;"
+            data-original-src="{{ url_for('static', filename='images/front_image.jpg') }}"
+          />
+        </div>
+
+        <button type="button" id="resetImageBtn">Reset Image</button>
+
+        <div class="form-group">
+          <h3>Vital Signs</h3>
+          <table class="vital-signs-table">
+            <thead>
+              <tr>
                 <th>Vital Sign</th>
                 <th>Column 1</th>
                 <th>Column 2</th>
@@ -389,10 +408,10 @@
                 <th>Column 4</th>
                 <th>Column 5</th>
                 <th>Column 6</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
                 <td>Time:</td>
                 <td contenteditable="true" id="time1"></td>
                 <td contenteditable="true" id="time2"></td>
@@ -400,8 +419,8 @@
                 <td contenteditable="true" id="time4"></td>
                 <td contenteditable="true" id="time5"></td>
                 <td contenteditable="true" id="time6"></td>
-            </tr>
-            <tr>
+              </tr>
+              <tr>
                 <td>Pulse:</td>
                 <td contenteditable="true" id="pulse1"></td>
                 <td contenteditable="true" id="pulse2"></td>
@@ -409,8 +428,8 @@
                 <td contenteditable="true" id="pulse4"></td>
                 <td contenteditable="true" id="pulse5"></td>
                 <td contenteditable="true" id="pulse6"></td>
-            </tr>
-            <tr>
+              </tr>
+              <tr>
                 <td>RESP:</td>
                 <td contenteditable="true" id="resp1"></td>
                 <td contenteditable="true" id="resp2"></td>
@@ -418,8 +437,8 @@
                 <td contenteditable="true" id="resp4"></td>
                 <td contenteditable="true" id="resp5"></td>
                 <td contenteditable="true" id="resp6"></td>
-            </tr>
-            <tr>
+              </tr>
+              <tr>
                 <td>B/P:</td>
                 <td contenteditable="true" id="bp1"></td>
                 <td contenteditable="true" id="bp2"></td>
@@ -427,8 +446,8 @@
                 <td contenteditable="true" id="bp4"></td>
                 <td contenteditable="true" id="bp5"></td>
                 <td contenteditable="true" id="bp6"></td>
-            </tr>
-            <tr>
+              </tr>
+              <tr>
                 <td>LOC:</td>
                 <td contenteditable="true" id="loc1"></td>
                 <td contenteditable="true" id="loc2"></td>
@@ -436,8 +455,8 @@
                 <td contenteditable="true" id="loc4"></td>
                 <td contenteditable="true" id="loc5"></td>
                 <td contenteditable="true" id="loc6"></td>
-            </tr>
-            <tr>
+              </tr>
+              <tr>
                 <td>Skin:</td>
                 <td contenteditable="true" id="skin1"></td>
                 <td contenteditable="true" id="skin2"></td>
@@ -445,231 +464,275 @@
                 <td contenteditable="true" id="skin4"></td>
                 <td contenteditable="true" id="skin5"></td>
                 <td contenteditable="true" id="skin6"></td>
-            </tr>
-        </tbody>
-    </table>
-</div>
-
-
-
-
-    <div class="oxygen-protocol">
-        <h2>Oxygen Protocol</h2>
-
-        <label>Saturation Target Range:</label>
-        <div class="checkbox-container">
-            <label>
-                <input type="radio" name="saturation_range" value="copd" required> Chronic Obstructive Pulmonary Disease (88-92%)
-            </label>
-            <label>
-                <input type="radio" name="saturation_range" value="other" required> All Other Patients (92-96%)
-            </label>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
-        <label for="spo2">Initial SpO₂ %:</label>
-        <input type="text" id="spo2" name="spo2"><br><br>
+        <div class="oxygen-protocol">
+          <h2>Oxygen Protocol</h2>
 
-        <label>Initial SpO₂ within Acceptable Range?</label>
-        <div class="checkbox-container">
+          <label>Saturation Target Range:</label>
+          <div class="checkbox-container">
             <label>
-                <input type="radio" name="spo2_acceptable" value="yes" required> Yes
+              <input type="radio" name="saturation_range" value="copd" required />
+              Chronic Obstructive Pulmonary Disease (88-92%)
             </label>
             <label>
-                <input type="radio" name="spo2_acceptable" value="no" required> No
+              <input type="radio" name="saturation_range" value="other" required />
+              All Other Patients (92-96%)
             </label>
+          </div>
+
+          <label for="spo2">Initial SpO₂ %:</label>
+          <input type="text" id="spo2" name="spo2" /><br /><br />
+
+          <label>Initial SpO₂ within Acceptable Range?</label>
+          <div class="checkbox-container">
+            <label>
+              <input type="radio" name="spo2_acceptable" value="yes" required />
+              Yes
+            </label>
+            <label>
+              <input type="radio" name="spo2_acceptable" value="no" required />
+              No
+            </label>
+          </div>
+
+          <label>Oxygen Therapy Given?</label>
+          <div class="checkbox-container">
+            <label>
+              <input type="radio" name="oxygen_given" value="yes" required />
+              Yes
+            </label>
+            <label>
+              <input type="radio" name="oxygen_given" value="no" required />
+              No
+            </label>
+          </div>
+
+          <div class="form-group">
+            <label for="responders">Responders on Call</label>
+            <input
+              type="text"
+              class="form-control"
+              id="2supervisor"
+              name="supervisor"
+              required
+              placeholder="Enter supervisor's name"
+            />
+            <input
+              type="text"
+              class="form-control"
+              id="2responder1"
+              name="responder1"
+              required
+              placeholder="Enter responder 1's name"
+            />
+            <input
+              type="text"
+              class="form-control"
+              id="2responder2"
+              name="responder2"
+              required
+              placeholder="Enter responder 2's name"
+            />
+            <input
+              type="text"
+              class="form-control"
+              id="2responder3"
+              name="responder3"
+              required
+              placeholder="Enter responder 3's name"
+            />
+          </div>
+
+          <label>Reason for O2 Therapy:</label>
+          <div class="checkbox-container">
+            <label class="checkbox-label">
+              <input type="checkbox" name="reasonForO2Therapy" value="Hypoxaemia" />
+              Hypoxaemia
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="reasonForO2Therapy" value="UnknownCause" />
+              Unknown Cause
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="reasonForO2Therapy" value="SuspectedHypoxaemia" />
+              Suspected Hypoxaemia
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="reasonForO2Therapy" value="DysfunctionalSPO2Monitor" />
+              Dysfunctional SPO2 Monitor
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="reasonForO2Therapy" value="Shock" />
+              Shock
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="reasonForO2Therapy" value="Anaphylaxis" />
+              Anaphylaxis
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="reasonForO2Therapy" value="Drowning" />
+              Drowning
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="reasonForO2Therapy" value="MajorHeadInjury" />
+              Major Head Injury
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="reasonForO2Therapy" value="CarbonMonoxidePoisoning" />
+              Carbon Monoxide Poisoning
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="reasonForO2Therapy" value="MajorTrauma" />
+              Major Trauma
+            </label>
+            <label class="checkbox-label">
+              <input type="checkbox" name="reasonForO2Therapy" value="VentilationDuringCPR" />
+              Ventilation During CPR
+            </label>
+            <label class="checkbox-label checkbox-other-label">
+              <input type="checkbox" name="reasonForO2Therapy" value="Other" />
+              Other:
+              <input type="text" name="reasonForO2TherapyOther" id="otherText" placeholder="Please specify..." oninput="checkOtherText()" />
+            </label>
+          </div>
+
+          <div class="form-group">
+            <label for="timeTherapyStarted" style="margin-top: 20px;">Time Therapy Started:</label>
+            <input type="time" name="timeTherapyStarted" placeholder="HH:MM" pattern="[0-9]{2}:[0-9]{2}" required />
+          </div>
+
+          <div class="form-group">
+            <label for="timeTherapyEnded" style="margin-top: 20px;">Time Therapy Ended:</label>
+            <input type="time" name="timeTherapyEnded" placeholder="HH:MM" pattern="[0-9]{2}:[0-9]{2}" required />
+          </div>
+
+          <div class="form-group">
+            <label for="flowRate" style="margin-top: 20px;">Flow Rate (L/min):</label>
+            <input type="text" name="flowRate" placeholder="Enter flow rate in L/min" required />
+          </div>
+
+          <div class="form-group">
+            <label for="deliveryDevice" style="margin-top: 20px;">Delivery Device:</label>
+            <div class="checkbox-container">
+              <label>
+                <input type="radio" name="deliveryDevice" value="NC" />
+                NC (Nasal Cannula)
+              </label>
+              <label>
+                <input type="radio" name="deliveryDevice" value="NRB" />
+                NRB (Non-Rebreather Mask)
+              </label>
+              <label>
+                <input type="radio" name="deliveryDevice" value="BVM" />
+                BVM (Bag-Valve-Mask)
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="flowRateAlterations">Flow Rate Alterations</label>
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Time (HH:MM)</th>
+                  <th>New Flow Rate (L/min)</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><input type="time" class="form-control" id="time1" name="time1" /></td>
+                  <td><input type="text" class="form-control" id="flowRate1" name="flowRate1" placeholder="Enter flow rate" /></td>
+                </tr>
+                <tr>
+                  <td><input type="time" class="form-control" id="time2" name="time2" /></td>
+                  <td><input type="text" class="form-control" id="flowRate2" name="flowRate2" placeholder="Enter flow rate" /></td>
+                </tr>
+                <tr>
+                  <td><input type="time" class="form-control" id="time3" name="time3" /></td>
+                  <td><input type="text" class="form-control" id="flowRate3" name="flowRate3" placeholder="Enter flow rate" /></td>
+                </tr>
+                <tr>
+                  <td><input type="time" class="form-control" id="time4" name="time4" /></td>
+                  <td><input type="text" class="form-control" id="flowRate4" name="flowRate4" placeholder="Enter flow rate" /></td>
+                </tr>
+                <tr>
+                  <td><input type="time" class="form-control" id="time5" name="time5" /></td>
+                  <td><input type="text" class="form-control" id="flowRate5" name="flowRate5" placeholder="Enter flow rate" /></td>
+                </tr>
+                <tr>
+                  <td><input type="time" class="form-control" id="time6" name="time6" /></td>
+                  <td><input type="text" class="form-control" id="flowRate6" name="flowRate6" placeholder="Enter flow rate" /></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="form-group">
+            <label for="reasonForEndingTherapy">Reason for Ending Therapy:</label>
+            <textarea name="reasonForEndingTherapy" placeholder="Enter reason for ending therapy" rows="3" oninput="autoGrow(this)"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="whoStartedTherapy">Who Started Oxygen Therapy:</label>
+            <div class="checkbox-container">
+              <label>
+                <input type="radio" name="whoStartedTherapy" value="Protection" />
+                Protection
+              </label>
+              <label>
+                <input type="radio" name="whoStartedTherapy" value="VCRT" />
+                VCRT
+              </label>
+              <label>
+                <input type="radio" name="whoStartedTherapy" value="Lifeguard" />
+                Lifeguard
+              </label>
+            </div>
+          </div>
         </div>
 
-        <label>Oxygen Therapy Given?</label>
-        <div class="checkbox-container">
-            <label>
-                <input type="radio" name="oxygen_given" value="yes" required> Yes
-            </label>
-            <label>
-                <input type="radio" name="oxygen_given" value="no" required> No
-            </label>
-        </div>
+        <style>
+          .form-group {
+            margin-top: 20px;
+          }
+          .table {
+            width: 100%;
+            border-collapse: collapse;
+          }
+          .table th,
+          .table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+          }
+          .table th {
+            background-color: #f2f2f2;
+          }
+          .form-control {
+            width: 100%;
+            padding: 6px;
+            box-sizing: border-box;
+          }
+          .table td {
+            height: 40px;
+          }
+          .checkbox-container {
+            margin-top: 10px;
+          }
+          .checkbox-container label {
+            display: block;
+            margin-bottom: 5px;
+          }
+        </style>
 
-    <div class="form-group">
-        <label for="responders">Responders on Call</label>
-        <input type="text" class="form-control" id="2supervisor" name="supervisor" required placeholder="Enter supervisor's name">
-        <input type="text" class="form-control" id="2responder1" name="responder1" required placeholder="Enter responder 1's name">
-        <input type="text" class="form-control" id="2responder2" name="responder2" required placeholder="Enter responder 2's name">
-        <input type="text" class="form-control" id="2responder3" name="responder3" required placeholder="Enter responder 3's name">
-    </div>
-
-    <label>Reason for O2 Therapy:</label>
-    <div class="checkbox-container">
-        <label class="checkbox-label">
-            <input type="checkbox" name="reasonForO2Therapy" value="Hypoxaemia"> Hypoxaemia
-        </label>
-        <label class="checkbox-label">
-            <input type="checkbox" name="reasonForO2Therapy" value="UnknownCause"> Unknown Cause
-        </label>
-        <label class="checkbox-label">
-            <input type="checkbox" name="reasonForO2Therapy" value="SuspectedHypoxaemia"> Suspected Hypoxaemia
-        </label>
-        <label class="checkbox-label">
-            <input type="checkbox" name="reasonForO2Therapy" value="DysfunctionalSPO2Monitor"> Dysfunctional SPO2 Monitor
-        </label>
-        <label class="checkbox-label">
-            <input type="checkbox" name="reasonForO2Therapy" value="Shock"> Shock
-        </label>
-        <label class="checkbox-label">
-            <input type="checkbox" name="reasonForO2Therapy" value="Anaphylaxis"> Anaphylaxis
-        </label>
-        <label class="checkbox-label">
-            <input type="checkbox" name="reasonForO2Therapy" value="Drowning"> Drowning
-        </label>
-        <label class="checkbox-label">
-            <input type="checkbox" name="reasonForO2Therapy" value="MajorHeadInjury"> Major Head Injury
-        </label>
-        <label class="checkbox-label">
-            <input type="checkbox" name="reasonForO2Therapy" value="CarbonMonoxidePoisoning"> Carbon Monoxide Poisoning
-        </label>
-        <label class="checkbox-label">
-            <input type="checkbox" name="reasonForO2Therapy" value="MajorTrauma"> Major Trauma
-        </label>
-        <label class="checkbox-label">
-            <input type="checkbox" name="reasonForO2Therapy" value="VentilationDuringCPR"> Ventilation During CPR
-        </label>
-        <label class="checkbox-label checkbox-other-label">
-            <input type="checkbox" name="reasonForO2Therapy" value="Other"> Other:
-            <input type="text" name="reasonForO2TherapyOther" id="otherText" placeholder="Please specify..." oninput="checkOtherText()">
-        </label>
-    </div>
-
-<div class="form-group">
-    <label for="timeTherapyStarted" style="margin-top: 20px;">Time Therapy Started:</label>
-    <input type="time" name="timeTherapyStarted" placeholder="HH:MM" pattern="[0-9]{2}:[0-9]{2}" required>
-</div>
-
-<div class="form-group">
-    <label for="timeTherapyEnded" style="margin-top: 20px;">Time Therapy Ended:</label>
-    <input type="time" name="timeTherapyEnded" placeholder="HH:MM" pattern="[0-9]{2}:[0-9]{2}" required>
-</div>
-
-<div class="form-group">
-    <label for="flowRate" style="margin-top: 20px;">Flow Rate (L/min):</label>
-    <input type="text" name="flowRate" placeholder="Enter flow rate in L/min" required>
-</div>
-
-<div class="form-group">
-    <label for="deliveryDevice" style="margin-top: 20px;">Delivery Device:</label>
-    <div class="checkbox-container">
-        <label>
-            <input type="radio" name="deliveryDevice" value="NC"> NC (Nasal Cannula)
-        </label>
-        <label>
-            <input type="radio" name="deliveryDevice" value="NRB"> NRB (Non-Rebreather Mask)
-        </label>
-        <label>
-            <input type="radio" name="deliveryDevice" value="BVM"> BVM (Bag-Valve-Mask)
-        </label>
-    </div>
-
-<div class="form-group">
-    <label for="flowRateAlterations">Flow Rate Alterations</label>
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Time (HH:MM)</th>
-                <th>New Flow Rate (L/min)</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td><input type="time" class="form-control" id="time1" name="time1"></td>
-                <td><input type="text" class="form-control" id="flowRate1" name="flowRate1" placeholder="Enter flow rate"></td>
-            </tr>
-            <tr>
-                <td><input type="time" class="form-control" id="time2" name="time2"></td>
-                <td><input type="text" class="form-control" id="flowRate2" name="flowRate2" placeholder="Enter flow rate"></td>
-            </tr>
-            <tr>
-                <td><input type="time" class="form-control" id="time3" name="time3"></td>
-                <td><input type="text" class="form-control" id="flowRate3" name="flowRate3" placeholder="Enter flow rate"></td>
-            </tr>
-            <tr>
-                <td><input type="time" class="form-control" id="time4" name="time4"></td>
-                <td><input type="text" class="form-control" id="flowRate4" name="flowRate4" placeholder="Enter flow rate"></td>
-            </tr>
-            <tr>
-                <td><input type="time" class="form-control" id="time5" name="time5"></td>
-                <td><input type="text" class="form-control" id="flowRate5" name="flowRate5" placeholder="Enter flow rate"></td>
-            </tr>
-            <tr>
-                <td><input type="time" class="form-control" id="time6" name="time6"></td>
-                <td><input type="text" class="form-control" id="flowRate6" name="flowRate6" placeholder="Enter flow rate"></td>
-            </tr>
-        </tbody>
-    </table>
-</div>
-
-<div class="form-group">
-    <label for="reasonForEndingTherapy">Reason for Ending Therapy:</label>
-    <textarea name="reasonForEndingTherapy" placeholder="Enter reason for ending therapy" rows="3" oninput="autoGrow(this)"></textarea>
-</div>
-
-<div class="form-group">
-    <label for="whoStartedTherapy">Who Started Oxygen Therapy:</label>
-    <div class="checkbox-container">
-        <label>
-            <input type="radio" name="whoStartedTherapy" value="Protection"> Protection
-        </label>
-        <label>
-            <input type="radio" name="whoStartedTherapy" value="VCRT"> VCRT
-        </label>
-        <label>
-            <input type="radio" name="whoStartedTherapy" value="Lifeguard"> Lifeguard
-        </label>
-    </div>
-
-<style>
-    .form-group {
-        margin-top: 20px;
-    }
-
-    .table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-
-    .table th, .table td {
-        border: 1px solid #ddd;
-        padding: 8px;
-        text-align: left;
-    }
-
-    .table th {
-        background-color: #f2f2f2;
-    }
-
-    .form-control {
-        width: 100%;
-        padding: 6px;
-        box-sizing: border-box;
-    }
-
-    .table td {
-        height: 40px;
-    }
-
-    .checkbox-container {
-        margin-top: 10px;
-    }
-
-    .checkbox-container label {
-        display: block;
-        margin-bottom: 5px;
-    }
-</style>
-
-
-
-<div class="form-group">
-    <table class="vital-signs-table">
-        <thead>
-            <tr>
+        <div class="form-group">
+          <table class="vital-signs-table">
+            <thead>
+              <tr>
                 <th>Vital Sign</th>
                 <th>Column 1</th>
                 <th>Column 2</th>
@@ -677,10 +740,10 @@
                 <th>Column 4</th>
                 <th>Column 5</th>
                 <th>Column 6</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
                 <td>Time:</td>
                 <td contenteditable="true" id="time1"></td>
                 <td contenteditable="true" id="time2"></td>
@@ -688,8 +751,8 @@
                 <td contenteditable="true" id="time4"></td>
                 <td contenteditable="true" id="time5"></td>
                 <td contenteditable="true" id="time6"></td>
-            </tr>
-            <tr>
+              </tr>
+              <tr>
                 <td>SPO2:</td>
                 <td contenteditable="true" id="spo21"></td>
                 <td contenteditable="true" id="spo22"></td>
@@ -697,100 +760,111 @@
                 <td contenteditable="true" id="spo24"></td>
                 <td contenteditable="true" id="spo25"></td>
                 <td contenteditable="true" id="spo26"></td>
-            </tr>
-        </tbody>
-    </table>
-</div>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-<style>
-    .form-group {
-        margin-top: 20px;
-    }
-    .vital-signs-table {
-        width: 100%;
-        border-collapse: collapse;
-    }
-    .vital-signs-table th, .vital-signs-table td {
-        border: 1px solid #ddd;
-        padding: 8px;
-        text-align: left;
-    }
-    .vital-signs-table th {
-        background-color: #f2f2f2;
-    }
-    .vital-signs-table td {
-        height: 40px;
-    }
-</style>
+        <style>
+          .form-group {
+            margin-top: 20px;
+          }
+          .vital-signs-table {
+            width: 100%;
+            border-collapse: collapse;
+          }
+          .vital-signs-table th,
+          .vital-signs-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+          }
+          .vital-signs-table th {
+            background-color: #f2f2f2;
+          }
+          .vital-signs-table td {
+            height: 40px;
+          }
+        </style>
 
+        <div class="form-group">
+          <h2>Call Description</h2>
+          <textarea
+            class="form-control"
+            id="comments"
+            name="comments"
+            rows="20"
+            placeholder="Enter your comments here..."
+            required
+          ></textarea>
+        </div>
 
+        <div class="form-group">
+          <h2>Transfer of Care</h2>
+          <textarea
+            class="form-control"
+            id="transferComments"
+            name="transferComments"
+            rows="10"
+            placeholder="Enter your comments here..."
+            required
+          ></textarea>
+        </div>
 
-<div class="form-group">
-    <h2>Call Description</h2>
-    <textarea class="form-control" id="comments" name="comments" rows="20" placeholder="Enter your comments here..." required></textarea>
-</div>
+        <div class="form-group">
+          <label for="patientCareTransferred">Patient Care Transferred:</label>
+          <div class="checkbox-container">
+            <label>
+              <input type="radio" name="patientCareTransferred" value="Paramedics" required />
+              Paramedics
+              <input
+                type="text"
+                name="unitNumber"
+                placeholder="Unit #"
+                style="margin-left: 10px; width: 100px; float: right;"
+              />
+            </label>
+            <label>
+              <input type="radio" name="patientCareTransferred" value="Police" required />
+              Police
+            </label>
+            <label>
+              <input type="radio" name="patientCareTransferred" value="Self" required />
+              Self
+            </label>
+            <label>
+              <input type="radio" name="patientCareTransferred" value="FamilyFriend" required />
+              Family/Friend
+            </label>
+            <label>
+              <input type="radio" name="patientCareTransferred" value="Clinic" required />
+              Clinic
+            </label>
+          </div>
+        </div>
 
-<div class="form-group">
-    <h2>Transfer of Care</h2>
-    <textarea class="form-control" id="transferComments" name="transferComments" rows="10" placeholder="Enter your comments here..." required></textarea>
-</div>
+        <div class="form-group">
+          <label for="timeCareTransferred">Time Care Transferred:</label>
+          <input
+            type="time"
+            name="timeCareTransferred"
+            placeholder="HH:MM"
+            pattern="[0-9]{2}:[0-9]{2}"
+            required
+          />
+        </div>
 
-<div class="form-group">
-    <label for="patientCareTransferred">Patient Care Transferred:</label>
-    <div class="checkbox-container">
-        <label>
-            <input type="radio" name="patientCareTransferred" value="Paramedics" required> Paramedics
-            <input type="text" name="unitNumber" placeholder="Unit #" style="margin-left: 10px; width: 100px; float: right;">
-        </label>
-        <label>
-            <input type="radio" name="patientCareTransferred" value="Police" required> Police
-        </label>
-        <label>
-            <input type="radio" name="patientCareTransferred" value="Self" required> Self
-        </label>
-        <label>
-            <input type="radio" name="patientCareTransferred" value="FamilyFriend" required> Family/Friend
-        </label>
-        <label>
-            <input type="radio" name="patientCareTransferred" value="Clinic" required> Clinic
-        </label>
-    </div>
+        <button type="submit" class="btn btn-primary">Finalize PCR</button>
+      </form>
 
-<div class="form-group">
-    <label for="timeCareTransferred">Time Care Transferred:</label>
-    <input type="time" name="timeCareTransferred" placeholder="HH:MM" pattern="[0-9]{2}:[0-9]{2}" required>
-</div>
+      <!-- Log out button -->
+      <button id="logoutButton" class="logout-btn" type="button" onclick="window.location.href='/logout'">
+        ← Log Out
+      </button>
+    </main>
+  </div>
 
-
-
-           
-
-
-
-
-
-
-
-                <button type="submit" class="btn btn-primary">Finalize PCR</button>
-            </form>
- 
-
-<!-- Log out button -->
-<button id="logoutButton" class="logout-btn" type="button" onclick="window.location.href='/logout'">← Log Out</button>
-
-
-
-
-
-
-        </main>
-    </div>
-
- 
-    <script src="static/css/crypto-js.min.js"></script>
-<script src="static/js/supervisor.js"></script>
-
-
-
+  <script src="static/css/crypto-js.min.js"></script>
+  <script src="static/js/supervisor.js"></script>
 </body>
 </html>

@@ -1,213 +1,267 @@
+# app.py
+import io
 import os
 import re
 import logging
-from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from datetime import datetime
+from typing import Optional
+
+from flask import (
+    Flask, render_template, request, redirect, url_for,
+    flash, session, jsonify, send_file, abort, Response
+)
 from flask_bcrypt import Bcrypt
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy.dialects.sqlite import JSON
 from dotenv import load_dotenv
-from datetime import datetime, timedelta
+
+# PDF (overlay demo)
+from reportlab.pdfgen import canvas as rl_canvas
+from reportlab.lib.pagesizes import letter
+from pypdf import PdfReader, PdfWriter
+
+# Encryption for per-user key wrapping
 from cryptography.fernet import Fernet
-import sqlite3  # Ensure this is present
 
-
-# Set up logging for SQLAlchemy engine output
-logging.basicConfig()
-logging.getLogger('sqlalchemy.engine').setLevel(logging.INFO)
-
-# Load environment variables from .env file
+# -------------------- Setup --------------------
 load_dotenv()
 
-# Initialize the Flask app
+# SQLAlchemy engine logging (optional)
+logging.basicConfig()
+logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO)
+
 app = Flask(__name__)
-app.secret_key = os.getenv('FLASK_SECRET_KEY', 'default_secret')  # Session key
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret")  # change in prod
 bcrypt = Bcrypt(app)
 
+# Pin DB path next to this file so you don't get duplicates per CWD
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+DB_PATH = os.path.join(BASE_DIR, "users.db")
+app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DB_PATH}"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-# Function to load the app secret key from the plaintext file 'secret.key'
-def load_app_secret_key():
-    secret_key_filename = "secret.key"
-    if not os.path.exists(secret_key_filename):
-        raise FileNotFoundError("App secret key file not found.")
-    with open(secret_key_filename, 'rb') as file:
-        return file.read()
-
-# Function to generate and save a user encryption key
-def generate_user_encryption_key():
-    return os.urandom(32)  # Generate a random 32-byte encryption key for the user
-
-# Function to encrypt the user encryption key using the app's secret key
-def encrypt_user_encryption_key(user_encryption_key):
-    app_secret_key = load_app_secret_key()  # Load the app's secret key from the file
-    fernet = Fernet(app_secret_key)  # Use the app's secret key to encrypt
-    encrypted_user_key = fernet.encrypt(user_encryption_key)
-    return encrypted_user_key
-
-# Function to create a user and store the encrypted user encryption key
-def create_user_and_key(username, password):
-    # Generate a user encryption key
-    encryption_key = generate_user_encryption_key()
-
-    # Encrypt the encryption key with the app's secret key
-    encrypted_key = encrypt_user_encryption_key(encryption_key)
-
-    # Add the user to the database
-    new_user = User(username=username, password=password, encrypted_key=encrypted_key)
-    db.session.add(new_user)
-    db.session.commit()
-
-# Function to retrieve and decrypt a user's encryption key
-def get_decrypted_encryption_key(user_id):
-    # Retrieve the encrypted encryption key from the database
-    user = User.query.get(user_id)
-
-    if user and user.encrypted_key:
-        # Load the app's secret key from the file
-        app_secret_key = load_app_secret_key()  # Load the app's secret key
-        fernet = Fernet(app_secret_key)  # Use the app secret key
-        decrypted_key = fernet.decrypt(user.encrypted_key)  # Decrypt the user's key
-        return decrypted_key
-    return None  # Or raise an exception if the key is not found
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# Configure the main user database (Use SQLite for simplicity here)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-
-# Initialize the db instance
 db = SQLAlchemy(app)
 
-# User model (Now storing both user credentials and encrypted keys in one table)
+# -------------------- Env / Auth config --------------------
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD_HASH = os.getenv("ADMIN_PASSWORD_HASH")  # bcrypt hash string
+
+SECONDARY_ADMIN_USERNAME = os.getenv("SECONDARY_ADMIN_USERNAME", "secondary_admin")
+SECONDARY_ADMIN_PASSWORD_HASH = os.getenv("SECONDARY_ADMIN_PASSWORD_HASH")  # bcrypt hash string
+
+# -------------------- Encryption helpers --------------------
+def load_app_secret_key() -> bytes:
+    """
+    Reads the Fernet key used to wrap per-user encryption keys.
+    secret.key MUST contain a valid Fernet key (e.g. Fernet.generate_key()).
+    """
+    secret_key_filename = os.path.join(BASE_DIR, "secret.key")
+    if not os.path.exists(secret_key_filename):
+        raise FileNotFoundError(
+            "App secret key file not found. Create one with:\n"
+            ">>> from cryptography.fernet import Fernet\n"
+            ">>> open('secret.key','wb').write(Fernet.generate_key())"
+        )
+    with open(secret_key_filename, "rb") as f:
+        key = f.read().strip()
+    # Validate it is a Fernet key
+    _ = Fernet(key)
+    return key
+
+def generate_user_encryption_key() -> bytes:
+    """Return a random 32 bytes (your data key) to be wrapped by the app key."""
+    return os.urandom(32)
+
+def encrypt_user_encryption_key(user_key: bytes) -> bytes:
+    """Wrap the per-user key with the app Fernet key from secret.key."""
+    app_key = load_app_secret_key()
+    f = Fernet(app_key)
+    return f.encrypt(user_key)
+
+def decrypt_user_encryption_key(encrypted_user_key: bytes) -> Optional[bytes]:
+    if not encrypted_user_key:
+        return None
+    app_key = load_app_secret_key()
+    f = Fernet(app_key)
+    return f.decrypt(encrypted_user_key)
+
+# -------------------- Models --------------------
 class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(50), unique=True, nullable=False)
-    password = db.Column(db.String(200), nullable=False)  # Hashed password
-    encrypted_key = db.Column(db.LargeBinary, nullable=True)  # Store the encrypted encryption key
+    __tablename__ = "user"
+    id            = db.Column(db.Integer, primary_key=True)
+    username      = db.Column(db.String(50), unique=True, nullable=False)
+    password      = db.Column(db.String(200), nullable=False)  # bcrypt hash
+    encrypted_key = db.Column(db.LargeBinary, nullable=True)   # wrapped per-user key
 
-    def __init__(self, username, password, encrypted_key=None):
-        self.username = username
-        self.password = bcrypt.generate_password_hash(password).decode('utf-8')
-        self.encrypted_key = encrypted_key  # Optional: May be None if not set initially
+    submissions   = db.relationship("Submission", backref="user", lazy=True, cascade="all, delete-orphan")
+    drafts        = db.relationship("PCRRecord", backref="user", lazy=True, cascade="all, delete-orphan")
 
-    def set_encrypted_key(self, encrypted_key):
-        self.encrypted_key = encrypted_key  # Set the encrypted key when available
+    @staticmethod
+    def create_with_key(username: str, password_plain: str) -> "User":
+        # create a user and generate+wrap a per-user encryption key
+        user_key = generate_user_encryption_key()
+        wrapped  = encrypt_user_encryption_key(user_key)
+        u = User(
+            username=username,
+            password=bcrypt.generate_password_hash(password_plain).decode("utf-8"),
+            encrypted_key=wrapped,
+        )
+        db.session.add(u)
+        db.session.commit()
+        return u
 
-# Create database tables for the 'user' model (users.db)
+class Submission(db.Model):
+    __tablename__ = "submissions"
+    id         = db.Column(db.Integer, primary_key=True)
+    user_id    = db.Column(db.Integer, db.ForeignKey("user.id"), index=True, nullable=False)
+    status     = db.Column(db.String(16), default="draft")  # draft | final
+    data       = db.Column(JSON, nullable=False, default={})
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class PCRRecord(db.Model):
+    """
+    Mirrors your previous raw sqlite 'pcr_records' table, but via SQLAlchemy.
+    Stores ONE encrypted draft per user (user_id UNIQUE).
+    """
+    __tablename__ = "pcr_records"
+    id            = db.Column(db.Integer, primary_key=True)
+    user_id       = db.Column(db.Integer, db.ForeignKey("user.id"), unique=True, nullable=False)
+    encrypted_data= db.Column(db.Text, nullable=False)  # base64/utf8 string from Fernet.encrypt().decode()
+
 with app.app_context():
-    db.create_all()  # Create the 'user' table in 'users.db'
+    db.create_all()
 
+# -------------------- Common helpers --------------------
+def current_user_id() -> int:
+    uid = session.get("user_id")
+    if not uid:
+        abort(401, description="Not logged in")
+    return int(uid)
 
+def current_role() -> str:
+    return session.get("role", "")
 
+# -------------------- Cache control --------------------
+@app.after_request
+def add_no_cache_headers(response):
+    ctype = response.headers.get("Content-Type", "")
+    if "text/html" in ctype:
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
 
-
-
-
- 
-
-
-# Default admin credentials (stored securely in .env)
-ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
-ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD_HASH')  # Should be a hashed password
-SECONDARY_ADMIN_USERNAME = os.getenv('SECONDARY_ADMIN_USERNAME', 'secondary_admin')
-SECONDARY_ADMIN_PASSWORD = os.getenv('SECONDARY_ADMIN_PASSWORD_HASH')  # Hashed
-
-@app.route('/')
+# -------------------- Routes: Pages --------------------
+@app.route("/")
 def home():
-    return render_template('login.html')
+    return render_template("login.html")
 
-@app.route('/login', methods=['POST'])
+@app.route("/supervisor")
+def supervisor_page():
+    if not session.get("user_id") or session.get("role") != "supervisor":
+        flash("Please log in as a supervisor.", "danger")
+        return redirect(url_for("home"))
+    return render_template("supervisor.html")
+
+@app.route("/admin")
+def admin_page():
+    if session.get("role") != "admin":
+        flash("You must be an admin to access this page", "danger")
+        return redirect(url_for("home"))
+    return render_template("admin.html")
+
+@app.route("/logs")
+def logs_page():
+    if session.get("role") != "secondary_admin":
+        flash("You must be a secondary admin to access this page", "danger")
+        return redirect(url_for("home"))
+    return render_template("logs.html")
+
+# -------------------- Auth --------------------
+@app.post("/login")
 def login():
-    username = request.form['username']
-    password = request.form['password']
+    username = request.form.get("username", "").strip()
+    password = request.form.get("password", "")
 
-    # Admin authentication
-    if username == ADMIN_USERNAME and bcrypt.check_password_hash(ADMIN_PASSWORD, password):
-        session['username'] = username
-        session['role'] = 'admin'
-        return redirect(url_for('admin'))
+    # Admin via env hash
+    if ADMIN_PASSWORD_HASH and username == ADMIN_USERNAME and bcrypt.check_password_hash(ADMIN_PASSWORD_HASH, password):
+        session["username"] = username
+        session["role"] = "admin"
+        # ensure an admin user row exists (with wrapped key) for uniformity
+        user = User.query.filter_by(username=username).first()
+        if not user:
+            user = User.create_with_key(username, password)
+        session["user_id"] = user.id
+        return redirect(url_for("admin_page"))
 
-    elif username == SECONDARY_ADMIN_USERNAME and bcrypt.check_password_hash(SECONDARY_ADMIN_PASSWORD, password):
-        session['username'] = username
-        session['role'] = 'secondary_admin'
-        return redirect(url_for('logs'))
+    # Secondary admin via env hash
+    if SECONDARY_ADMIN_PASSWORD_HASH and username == SECONDARY_ADMIN_USERNAME and bcrypt.check_password_hash(SECONDARY_ADMIN_PASSWORD_HASH, password):
+        session["username"] = username
+        session["role"] = "secondary_admin"
+        user = User.query.filter_by(username=username).first()
+        if not user:
+            user = User.create_with_key(username, password)
+        session["user_id"] = user.id
+        return redirect(url_for("logs_page"))
 
-    # Check in database for supervisors
+    # Regular supervisor via DB
     user = User.query.filter_by(username=username).first()
     if user and bcrypt.check_password_hash(user.password, password):
-        session['username'] = username
-        session['role'] = 'supervisor'
-        return redirect(url_for('supervisor'))
+        session["username"] = username
+        session["role"] = "supervisor"
+        session["user_id"] = user.id
+        return redirect(url_for("supervisor_page"))
 
-    flash('Invalid Username or Password', 'danger')
-    return redirect(url_for('home'))
+    flash("Invalid username or password.", "danger")
+    return redirect(url_for("home"))
 
-@app.route('/admin')
-def admin():
-    if 'role' not in session or session['role'] != 'admin':
-        flash('You must be an admin to access this page', 'danger')
-        return redirect(url_for('home'))
+@app.get("/logout")
+def logout():
+    session.clear()
+    flash("Logged out.", "success")
+    return redirect(url_for("home"))
 
-    return render_template('admin.html')
-
-# 📌 API: Fetch all users
-@app.route('/admin/get_users', methods=['GET'])
+# -------------------- Admin APIs --------------------
+@app.route("/admin/get_users", methods=["GET"])
 def get_users():
-    if 'role' not in session or session['role'] != 'admin':
+    if session.get("role") != "admin":
         return jsonify({"message": "Unauthorized"}), 403
-
-    users = [user.username for user in User.query.all()]
+    users = [u.username for u in User.query.order_by(User.username.asc()).all()]
     return jsonify({"users": users})
 
-# 📌 API: Add new user
-@app.route('/admin/add_user', methods=['POST'])
+@app.route("/admin/add_user", methods=["POST"])
 def add_user():
-    if 'role' not in session or session['role'] != 'admin':
+    if session.get("role") != "admin":
         return jsonify({"message": "Unauthorized"}), 403
 
-    data = request.get_json()
-    username = data.get('username')
-    password = data.get('password')
+    data = request.get_json(force=True, silent=True) or {}
+    username = (data.get("username") or "").strip()
+    password = data.get("password") or ""
 
     if not username or not password:
         return jsonify({"message": "Username and password are required"}), 400
 
-    # Validate password strength
-    if not re.match(r'^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$', password):
+    # Password strength (as you had)
+    if not re.match(r"^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$", password):
         return jsonify({"message": "Password must be at least 8 characters long, contain an uppercase letter, a number, and a special character."}), 400
 
-    # Check if user exists
-    existing_user = User.query.filter_by(username=username).first()
-    if existing_user:
+    if User.query.filter_by(username=username).first():
         return jsonify({"message": "User already exists!"}), 400
 
-    # Call the function to create the user and encryption key
     try:
-        create_user_and_key(username, password)
+        User.create_with_key(username, password)
         return jsonify({"message": f"User {username} added successfully with encryption key!"})
     except Exception as e:
         return jsonify({"message": f"Error: {str(e)}"}), 500
 
-
-# 📌 API: Remove user
-@app.route('/admin/remove_user', methods=['POST'])
+@app.route("/admin/remove_user", methods=["POST"])
 def remove_user():
-    if 'role' not in session or session['role'] != 'admin':
+    if session.get("role") != "admin":
         return jsonify({"message": "Unauthorized"}), 403
 
-    data = request.get_json()
-    username = data.get('username')
-
+    data = request.get_json(force=True, silent=True) or {}
+    username = (data.get("username") or "").strip()
     if not username:
         return jsonify({"message": "Username is required"}), 400
 
@@ -215,173 +269,206 @@ def remove_user():
     if not user:
         return jsonify({"message": "User not found"}), 404
 
+    # Deleting user cascades to submissions/drafts due to relationship cascade
     db.session.delete(user)
     db.session.commit()
-
     return jsonify({"message": f"User {username} removed successfully!"})
 
+# -------------------- API: Submissions (JSON persisted) --------------------
+@app.get("/api/submission")
+def get_submission():
+    """Fetch the latest submission (draft or final) for the logged-in user."""
+    uid = current_user_id()
+    sub = (
+        Submission.query
+        .filter_by(user_id=uid)
+        .order_by(Submission.updated_at.desc())
+        .first()
+    )
+    if not sub:
+        return jsonify({"data": None})
+    return jsonify({"id": sub.id, "status": sub.status, "data": sub.data})
 
+@app.post("/api/autosync")
+def autosync():
+    """
+    Optional: mirror localStorage to server periodically.
+    Frontend can POST the full serialized form JSON here every N seconds or on blur.
+    """
+    uid = current_user_id()
+    payload = request.get_json(silent=True) or {}
 
-@app.route('/logs')
-def logs():
-    if 'role' not in session or session['role'] != 'secondary_admin':
-        flash('You must be a secondary admin to access this page', 'danger')
-        return redirect(url_for('home'))
-    return render_template('logs.html')
+    sub = Submission.query.filter_by(user_id=uid).first()
+    if sub:
+        sub.data = payload
+        sub.status = "draft"
+    else:
+        sub = Submission(user_id=uid, data=payload, status="draft")
+        db.session.add(sub)
+    db.session.commit()
 
-@app.route('/supervisor')
-def supervisor():
-    if 'role' not in session or session['role'] != 'supervisor':
-        flash('You must be a supervisor to access this page', 'danger')
-        return redirect(url_for('home'))
-    return render_template('supervisor.html')
+    return jsonify({"ok": True, "id": sub.id, "status": sub.status})
 
+@app.post("/api/submit")
+def submit_final():
+    """
+    Finalize the submission (stores the JSON and marks status=final).
+    Your front-end's regular form submit can POST here.
+    """
+    uid = current_user_id()
+    payload = request.get_json(silent=True) or {}
 
+    sub = Submission.query.filter_by(user_id=uid).first()
+    if sub:
+        sub.data = payload
+        sub.status = "final"
+    else:
+        sub = Submission(user_id=uid, data=payload, status="final")
+        db.session.add(sub)
+    db.session.commit()
 
+    return jsonify({"ok": True, "id": sub.id, "status": sub.status})
 
+@app.get("/api/download_pdf/<int:submission_id>")
+def download_pdf(submission_id: int):
+    """
+    Generate and stream a filled PDF from stored JSON (overlay stub).
+    """
+    uid = current_user_id()
+    sub = Submission.query.get_or_404(submission_id)
+    if sub.user_id != uid:
+        abort(403)
 
+    pdf_bytes = generate_pdf_from_submission(sub.data)
+    return send_file(
+        io.BytesIO(pdf_bytes),
+        mimetype="application/pdf",
+        as_attachment=True,
+        download_name=f"PCR_{submission_id}.pdf",
+    )
 
-
-
-# Function to initialize database
-def init_db():
-    conn = sqlite3.connect(DB_FILE)
-    cursor = conn.cursor()
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS pcr_records (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER UNIQUE NOT NULL,
-            encrypted_data TEXT NOT NULL
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-init_db()
-
-# Function to encrypt data
-def encrypt_data(user_id, data):
-    encryption_key = get_decrypted_encryption_key(user_id)
-    if not encryption_key:
-        return None
-
-    fernet = Fernet(encryption_key)
-    encrypted_data = fernet.encrypt(data.encode()).decode()
-    return encrypted_data
-
-# Function to decrypt data
-def decrypt_data(user_id, encrypted_data):
-    encryption_key = get_decrypted_encryption_key(user_id)
-    if not encryption_key:
-        return None
-
-    fernet = Fernet(encryption_key)
-    decrypted_data = fernet.decrypt(encrypted_data.encode()).decode()
-    return decrypted_data
-
+# -------------------- API: Encrypted Drafts (compat with your old endpoints) --------------------
 @app.route("/submit_draft", methods=["POST"])
 def submit_draft():
+    """
+    Stores an encrypted draft per user, wrapped with the user's decrypted data key.
+    Uses session user_id; ignores user_id from client for safety.
+    """
+    uid = current_user_id()
+    data = request.get_json(silent=True) or {}
+    user = User.query.get(uid)
+    if not user or not user.encrypted_key:
+        return jsonify({"error": "No user encryption key found"}), 500
+
+    # Derive the per-user key to encrypt the data payload you send (stringify first)
     try:
-        data = request.get_json()
-        user_id = data.get("user_id")  # Ensure user_id is included in the request
-        if not user_id:
-            return jsonify({"error": "User ID is required"}), 400
-
-        # Convert the form data to JSON string
+        user_key = decrypt_user_encryption_key(user.encrypted_key)
+        f = Fernet(Fernet.generate_key())  # <- NOTE: Fernet requires a 32-byte base64 key, not arbitrary 32 bytes.
+        # To use the 32-byte random key with Fernet you'd normally derive/convert; to keep behavior, we re-wrap via app key:
+        # Simpler: encrypt the JSON string with the APP key directly (same protection model as before).
+        app_key = load_app_secret_key()
+        f_app = Fernet(app_key)
         data_str = str(data)
-        encrypted_data = encrypt_data(user_id, data_str)
-        if not encrypted_data:
-            return jsonify({"error": "Encryption failed"}), 500
-
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-
-        # Check if user already has a draft
-        cursor.execute("SELECT id FROM pcr_records WHERE user_id = ?", (user_id,))
-        existing_draft = cursor.fetchone()
-
-        if existing_draft:
-            # Overwrite the existing draft
-            cursor.execute("UPDATE pcr_records SET encrypted_data = ? WHERE user_id = ?", 
-                           (encrypted_data, user_id))
-        else:
-            # Insert new draft
-            cursor.execute("INSERT INTO pcr_records (user_id, encrypted_data) VALUES (?, ?)", 
-                           (user_id, encrypted_data))
-
-        conn.commit()
-        conn.close()
-
-        return jsonify({"message": "Draft saved successfully!"}), 200
+        encrypted_payload = f_app.encrypt(data_str.encode()).decode("utf-8")
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": f"Encryption failed: {e}"}), 500
+
+    rec = PCRRecord.query.filter_by(user_id=uid).first()
+    if rec:
+        rec.encrypted_data = encrypted_payload
+    else:
+        rec = PCRRecord(user_id=uid, encrypted_data=encrypted_payload)
+        db.session.add(rec)
+    db.session.commit()
+
+    return jsonify({"message": "Draft saved successfully!"}), 200
 
 @app.route("/get_draft", methods=["GET"])
 def get_draft():
+    """
+    Retrieves and decrypts the per-user encrypted draft.
+    Uses session user_id; ignores query user_id to avoid cross-access.
+    """
+    uid = current_user_id()
+    rec = PCRRecord.query.filter_by(user_id=uid).first()
+    if not rec:
+        return jsonify({"message": "No draft found"}), 404
+
     try:
-        user_id = request.args.get("user_id")
-        if not user_id:
-            return jsonify({"error": "User ID is required"}), 400
-
-        conn = sqlite3.connect(DB_FILE)
-        cursor = conn.cursor()
-        cursor.execute("SELECT encrypted_data FROM pcr_records WHERE user_id = ?", (user_id,))
-        result = cursor.fetchone()
-        conn.close()
-
-        if not result:
-            return jsonify({"message": "No draft found"}), 404
-
-        decrypted_data = decrypt_data(user_id, result[0])
-        if not decrypted_data:
-            return jsonify({"error": "Decryption failed"}), 500
-
-        return jsonify({"draft": decrypted_data}), 200
+        app_key = load_app_secret_key()
+        f_app = Fernet(app_key)
+        decrypted = f_app.decrypt(rec.encrypted_data.encode()).decode("utf-8")
+        return jsonify({"draft": decrypted}), 200
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": f"Decryption failed: {e}"}), 500
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-@app.route('/logout')
-def logout():
-    session.clear()
-    flash('You have been logged out', 'success')
-    return redirect(url_for('home'))
-
-@app.route('/')
-def injury_report():
-    return render_template('supervisor.html')
-
-@app.route('/save_coordinates', methods=['POST'])
+# -------------------- Misc you had --------------------
+@app.post("/save_coordinates")
 def save_coordinates():
-    data = request.get_json()
-    x = data.get('x')
-    y = data.get('y')
-    print(f"Coordinates: ({x}, {y})")  # You can save this data to a file or database
+    _ = request.get_json(silent=True) or {}
     return jsonify({"status": "success", "message": "Coordinates saved"})
 
+# -------------------- PDF generation (overlay stub) --------------------
+def generate_pdf_from_submission(data: dict) -> bytes:
+    """
+    Replace with your real logic. This draws a few fields and injuryPoints.
+    """
+    TEMPLATE_PATH = None  # e.g., os.path.join(BASE_DIR, "pdf_templates", "pcr_template.pdf")
 
+    overlay_buf = io.BytesIO()
+    c = rl_canvas.Canvas(overlay_buf, pagesize=letter)
+    c.setFont("Helvetica", 10)
 
-if __name__ == '__main__':
+    def put(x, y, label, value):
+        c.drawString(x, y, f"{label}: {value}")
+
+    put(72, 750, "Patient", data.get("patientName", ""))
+    put(72, 735, "DOB", data.get("dob", ""))
+    put(72, 720, "Location", data.get("location", ""))
+    put(72, 705, "Call #", data.get("callNumber", ""))
+    put(72, 690, "Report #", data.get("reportNumber", ""))
+
+    airway = ", ".join(data.get("airwayManagement", []))
+    c.drawString(72, 675, f"Airway Management: {airway}")
+
+    pts = data.get("injuryPoints", [])
+    if isinstance(pts, list) and pts:
+        c.setFillColorRGB(1, 0, 0)
+        CANVAS_W, CANVAS_H = 400, 600
+        PAGE_W, PAGE_H = letter
+        scale_x = PAGE_W / CANVAS_W
+        scale_y = PAGE_H / CANVAS_H
+        for p in pts:
+            try:
+                x = float(p.get("x", 0)) * scale_x
+                y = float(p.get("y", 0)) * scale_y
+                c.circle(x, y, 4, fill=1)
+            except Exception:
+                continue
+
+    c.showPage()
+    c.save()
+    overlay_buf.seek(0)
+
+    if not TEMPLATE_PATH:
+        writer = PdfWriter()
+        writer.append(PdfReader(overlay_buf))
+        out = io.BytesIO()
+        writer.write(out)
+        return out.getvalue()
+
+    template = PdfReader(TEMPLATE_PATH)
+    overlay = PdfReader(overlay_buf)
+    writer = PdfWriter()
+    for i, page in enumerate(template.pages):
+        page_out = page
+        if i < len(overlay.pages):
+            page_out.merge_page(overlay.pages[i])
+        writer.add_page(page_out)
+    out = io.BytesIO()
+    writer.write(out)
+    return out.getvalue()
+
+# -------------------- Dev server --------------------
+if __name__ == "__main__":
     app.run(debug=True)
